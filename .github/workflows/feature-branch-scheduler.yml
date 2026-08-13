@@ -1,0 +1,22 @@
+name: Feature News Scheduler
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/auto-news-mvp
+      - uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - run: node --experimental-default-type=module worker/run.js
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      - run: git add data/articles.json && git diff --cached --quiet || git commit -m 'chore: update auto news'
+      - run: git push origin HEAD:feature/auto-news-mvp
