@@ -6,12 +6,15 @@ import {categories} from '../../lib/categories.js';
 import './editorial.css';
 
 export const dynamic='force-dynamic';
+const siteUrl='https://berita-auto.vercel.app';
 
 export default async function EditorialHome(){
   const articles=await readArticles();
   const featured=articles[0];
   const secondary=articles.slice(1,3);
+  const schema={'@context':'https://schema.org','@graph':[{'@type':'WebSite',name:'Berita Auto',url:siteUrl},{'@type':'Organization',name:'Berita Auto',url:siteUrl}]};
   return <>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(schema)}}/>
     <Header latestTitle={featured?.title||'Sistem sedang mencari berita terbaru…'}/>
     <main className="page container">
       <section className="intro"><span>BERITA HARI INI</span><h1>Berita terbaru, dirangkum otomatis.</h1><p>Informasi terbaru dari sumber publik, diperbarui setiap lima menit.</p></section>
