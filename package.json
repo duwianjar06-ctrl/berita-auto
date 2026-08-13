@@ -1,1 +1,1 @@
-{"name":"berita-auto","version":"1.0.0","private":true,"scripts":{"dev":"next dev","build":"next build","start":"next start","news:run":"node worker/run.js"},"dependencies":{"next":"latest","react":"latest","react-dom":"latest"}}
+{"name":"berita-auto","version":"1.0.0","private":true,"type":"module","scripts":{"dev":"next dev","build":"next build","start":"next start","news:run":"node worker/run.js"},"dependencies":{"next":"15.5.7","react":"19.1.0","react-dom":"19.1.0"}}
