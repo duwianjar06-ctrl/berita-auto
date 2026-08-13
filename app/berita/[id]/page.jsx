@@ -1,0 +1,2 @@
+import {readArticles} from '../../../lib/storage.js';
+export default async function ArticlePage({params}){const items=await readArticles();const article=items.find(x=>x.id===params.id);if(!article)return <main className="container"><h1>Artikel tidak ditemukan</h1></main>;return <main className="container"><p>{article.category}</p><h1>{article.title}</h1><p>{article.content}</p><a href={article.url} target="_blank" rel="noreferrer">Buka sumber ↗</a></main>}
