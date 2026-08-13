@@ -1,0 +1,1 @@
+export default function Home(){return <main><h1>Berita Auto</h1><p>Portal berita otomatis.</p></main>}
