@@ -1,6 +1,7 @@
 name: Feature News Scheduler
 
 # Production schedule lives on default branch and executes the feature branch.
+# This workflow also rebuilds the application after scheduler configuration changes.
 on:
   schedule:
     - cron: "*/5 * * * *"
