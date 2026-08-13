@@ -2,6 +2,10 @@
 
 Portal berita otomatis berbasis Next.js.
 
+## Production
+Production Branch: `feature/auto-news-mvp`
+Production URL: https://berita-auto.vercel.app
+
 ## Fitur
 - RSS news collection every 5 minutes via GitHub Actions.
 - Duplicate detection by source fingerprint.
