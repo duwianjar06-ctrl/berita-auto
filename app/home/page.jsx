@@ -5,6 +5,8 @@ import {readArticles} from '../../lib/storage.js';
 import {categories} from '../../lib/categories.js';
 import './editorial.css';
 
+export const dynamic='force-dynamic';
+
 export default async function EditorialHome(){
   const articles=await readArticles();
   const featured=articles[0];
