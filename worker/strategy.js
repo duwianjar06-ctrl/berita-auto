@@ -1,0 +1,1 @@
+export function selectCandidates(items,seen,max=3){const out=[],run=new Set();for(const i of items){const fp=i.fingerprint;if(seen.has(fp)||run.has(fp))continue;run.add(fp);out.push(i)}return out.sort((a,b)=>(Date.parse(b.publishedAt)||0)-(Date.parse(a.publishedAt)||0)).slice(0,max)}
