@@ -9,181 +9,115 @@ Stack: Next.js 15.5.7, React 19.1, NextAuth v5 beta, Node 22 in GitHub Actions.
 ## Branch Strategy
 Application: `feature/auto-news-mvp`
 Scheduler/default: `main`
-Production branch: `feature/auto-news-mvp` (verified current Vercel project configuration; do not change to `main`)
+Production branch: `feature/auto-news-mvp`; never change it to `main`.
 Never force-push or force-update refs.
 
 ## Core Architecture
-Official RSS -> normalize/dedupe/classify -> pending queue -> select one/more according to adaptive catch-up -> source material -> provider registry (Gemini -> optional OpenAI) -> factual fallback -> image enrichment -> persistent publication storage.
+Official RSS -> normalize/dedupe/classify -> pending queue -> deterministic source-rotation selection -> source material -> provider registry (Gemini -> optional OpenAI) -> factual fallback -> image enrichment -> persistent publication storage.
 
-### Runtime Publication Architecture
 When Upstash Redis is configured, it is the live source of truth for published articles and the pending queue. GitHub JSON files are migration/backup snapshots, not the live production datastore.
 
-Production publication service is exposed through `/api/cron/news-publish` and delegates to the shared `runPublicationCycle({trigger, now})` implementation in `worker/run.js`. The endpoint never performs Git operations. It authenticates with `CRON_SECRET`, acquires the shared Redis publication lock, runs the normal queue/AI/image pipeline, writes the result to persistence, records telemetry, and releases the lock.
+Publication service: `/api/cron/news-publish` -> `runPublicationCycle({trigger, now})` in `worker/run.js`. The endpoint authenticates with `CRON_SECRET`, uses the shared Redis publication lock, runs the normal queue/AI/image pipeline, persists the result, records telemetry, and releases the lock. It never performs Git operations.
 
-Current trigger roles:
-- Primary target: Vercel Cron at approximately every five minutes, only after the project plan is verified to support the required interval.
-- Fallback: GitHub Actions workflow on `main`, which calls the same secured publication endpoint and does not write Git data itself.
-- Manual: the same shared publication cycle may be called by controlled recovery tooling.
+## Multi-source News Ingestion
+Source registry is the single source of truth in `lib/sources.js` and exports `NEWS_SOURCES` plus the enabled `sources` list. Every source has a stable `id`, `publisher`, `name`, official feed `url`, website `category`, `weight`, `enabled`, and language metadata.
 
-Do not implement a second publication business-logic path. All triggers must call the same publication service.
+Active publisher groups:
+- ANTARA
+- Liputan6
+- CNN Indonesia
+- CNBC Indonesia
+- Media Indonesia
+- Tribunnews
 
-### Persistence and Migration
+Current official feed endpoints are maintained in `lib/sources.js`. Feed discovery uses RSS/Atom only; no HTML scraping is part of the ingestion path. Feed failures are isolated per source and logged without failing the complete cycle.
+
+Source validation rules:
+- prefer an official publisher RSS/Atom/API endpoint;
+- do not add third-party proxy feeds when an official feed exists;
+- keep only metadata, summaries and source links needed for aggregation;
+- never copy full source articles into the repository or published content;
+- preserve `sourceId`, `publisher`, `sourceName`, and `sourceUrl` on queued/published records;
+- source timestamps and Berita Auto publication timestamps remain distinct.
+
+`lib/rss.js` fetches sources concurrently with a seven-second per-source timeout and returns source-level telemetry. A timeout, HTTP error, malformed feed, or empty feed produces a source failure/zero-item result rather than aborting the whole ingestion cycle.
+
+## Dedupe
+`worker/normalize.js` keeps a normalized canonical URL fingerprint and a normalized title fingerprint. Cross-source duplicates are rejected when either stable URL identity or normalized title identity already exists in published/pending state.
+
+The stable URL fingerprint remains SHA-256 based for backward compatibility. Title fingerprints are deterministic and inexpensive; semantic/AI dedupe is intentionally not required.
+
+## Category Mapping
+Use only categories already defined in `lib/categories.js`:
+`Nasional`, `Internasional`, `Ekonomi`, `Bisnis`, `Teknologi`, `Olahraga`, `Hiburan`, `Lifestyle`, `Otomotif`, `Sains`, `Politik`, `Daerah`.
+
+Feed/category hints are used first when they map to an existing category; otherwise the existing keyword classifier supplies the category.
+
+## Source Rotation
+`worker/strategy.js` applies deterministic source diversity scoring. It considers freshness, breaking-news relevance, category diversity, source weight, recent publisher use, consecutive-publisher use, and recent publisher share.
+
+Rules:
+- normal cadence remains one publication per run;
+- no more than two consecutive publications from the same publisher when alternatives are available;
+- the recent ten-publication window penalizes publishers at or above a 35% share;
+- recently unused publishers receive a deterministic diversity bonus;
+- freshness/quality wins when alternatives are unavailable;
+- catch-up can publish 2/3/5 articles according to the existing adaptive outage policy, and the history is updated after each publication so the same source is not repeatedly selected inside one catch-up run.
+
+Telemetry logs publisher distribution for the recent publication window. Admin source distribution continues to use real persisted article state.
+
+## Queue and Publication
+`worker/strategy.js` keeps the existing queue bounds and adaptive policy:
+- low watermark 30
+- target 60
+- maximum 120
+- freshness cutoff 12 hours
+- normal/delayed/stale/long-outage publication maxima: 1/2/3/5
+- hard maximum 5
+
+Pending candidates are never public. `sitePublishedAt` is the actual Berita Auto publication time; never synthesize cadence timestamps.
+
+## Persistence
 Persistence adapter: `lib/persistence.js` using the existing Upstash Redis REST configuration.
 
-Keys currently used by live publication:
+Live keys:
 - `ba:news:articles`
 - `ba:news:pending`
 - `ba:news:publication-lock`
-- existing pipeline keys under `ba:pipeline:*`
+- existing `ba:pipeline:*` keys
 
-On first access when a key is absent, the storage layer performs an idempotent migration from the existing `data/articles.json` or `data/pending-articles.json` snapshot. Existing IDs/fingerprints are preserved. Later production reads/writes use Redis only when persistence is configured.
+Production must fail closed when persistent storage is unavailable. Never overwrite `data/articles.json` or `data/pending-articles.json` from an application feature commit.
 
-Production must fail closed rather than silently falling back to stale bundled or GitHub data when persistent storage is unavailable.
+The publication lock is Redis `SET ... NX EX` and is shared by QStash, GitHub fallback, and recovery triggers. Never replace it with an in-memory/global lock.
 
-### Publication Lock
-`lib/persistence.js` provides an atomic Redis `SET ... NX EX` lock used by `runPublicationCycle` so Vercel Cron, GitHub fallback, and other recovery triggers cannot execute as concurrent writers. Lock TTL is intentionally slightly longer than the target worker runtime and must never be replaced by an in-memory/global JavaScript lock.
+## Article Metadata
+`sourcePublishedAt` = publisher's original publication timestamp.
+`sitePublishedAt` = Berita Auto publication timestamp.
+`updatedAt` = actual content update timestamp when available.
 
-### Adaptive Publication Policy
-`worker/strategy.js` currently uses:
-- normal: 1 publication
-- delayed: 2 publications
-- stale: 3 publications
-- long outage: 5 publications
-- hard maximum: 5
-
-The queue remains bounded at low watermark 30, target 60, max 120, with a 12-hour freshness cutoff. Catch-up is recovery only; normal cadence remains approximately one publication per five minutes.
-
-`data/articles.json` and `data/pending-articles.json` are still maintained for backup/migration and Git-based fallback compatibility. The live worker must not require a Git commit/push to make a production publication visible when Redis is configured.
-
-## Queue and Publication
-Configuration remains in `worker/strategy.js`:
-- normal ingestion max 24
-- catch-up ingestion max 48
-- queue target 60
-- low watermark 30
-- queue max 120
-- adaptive max publications: 1/2/3/5
-- hard publication max 5
-- freshness cutoff 12 hours
-- RSS concurrency 8
-- AI timeout 18s baseline
-- source material timeout 5s
-
-Pending candidates are never public. Publication timestamps use actual `sitePublishedAt` time; never synthesize five-minute timestamps for articles published together.
-
-## Shared Admin Notes
-`components/admin/AdminNotes.jsx` is now a thin client wrapper around `AdminWorkspace` and does not use localStorage as the source of truth.
-
-Persistent backend: existing Upstash Redis REST configuration, reused from the project analytics persistence pattern.
-Environment:
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
-
-Note model supports:
-`id`, `title`, `content`, `createdBy`, `createdByEmail`, `updatedBy`, `updatedByEmail`, `isPinned`, `createdAt`, `updatedAt`, optional `deletedAt`.
-
-All notes APIs are server-side protected with `auth()` plus `ADMIN_EMAILS`. CRUD and pin/unpin use API routes under `/api/admin/notes`. All authorized admins read the same records.
-
-Legacy localStorage notes are eligible for a one-time import after login. The migration flag may live in localStorage, but the note data source of truth remains the database. Duplicate legacy notes are skipped using title/content signatures.
-
-If Upstash credentials are absent, notes APIs fail closed with HTTP 503 rather than silently falling back to localStorage.
-
-## Project Work Log
-The Admin Workspace has `Catatan`, `Pekerjaan & Perbaikan`, and `Automation / News Pipeline` tabs.
-
-Work Log model supports:
-- title, description, type, status, priority
-- createdBy, updatedBy, assignedTo
-- problem, fixDescription, verificationResult, blocker
-- commitSha, deploymentId
-- createdAt, updatedAt, resolvedAt
-
-Types: Feature, Bug, Improvement, SEO, Scheduler, AI, UI, Deployment, Infrastructure, Security, Other.
-
-Statuses: Belum Dikerjakan, Sedang Dikerjakan, Sudah Diperbaiki, Sudah Disesuaikan, Perlu Verifikasi, Blocked, Gagal, Selesai.
-
-Priority: Low, Normal, High, Critical.
-
-Status semantics: code written is not completion; build success is still verification work; a production-ready deployment without route verification remains `Perlu Verifikasi`; `Blocked` is reserved for real external dependencies; `Selesai` requires production evidence.
-
-Known real issues are represented as stable baseline IDs and are not duplicated on every admin visit.
+Published records also retain `publisher`, `sourceName`, `sourceId`, `sourceUrl`, canonical article URL, fingerprint, and title fingerprint. `publishedAt` remains source-time-compatible for existing records.
 
 ## AI Provider Architecture
-`lib/ai-providers.js` defines the normalized provider registry and interface: `name`, `modelName`, `isConfigured`, `generate`, `timeoutMs`.
+`lib/ai-providers.js` uses Gemini primary, optional OpenAI secondary, and factual non-AI fallback. AI is never a hard dependency for publication. Provider metadata must reflect the real generation path.
 
-Active order:
-1. Gemini primary when `GEMINI_API_KEY` exists.
-2. OpenAI optional secondary when configured.
-3. factual non-AI fallback.
+Never log or commit provider credentials or raw credential-bearing responses.
 
-Provider errors normalize into safe classes such as rate limit, timeout, server error, auth, invalid response, unavailable, or unknown. No retry storm.
+## Scheduler
+**Primary scheduler: QStash.** It targets `GET https://berita-auto.vercel.app/api/cron/news-publish` with `Authorization: Bearer <CRON_SECRET>` forwarded securely. Target cadence: `*/5 * * * *`.
 
-Gemini environment:
-- `GEMINI_API_KEY` — GitHub Actions secret; never commit/log.
-- `GEMINI_MODEL` — repository variable.
+**Fallback/watchdog: GitHub Actions on `main`.** `.github/workflows/feature-branch-scheduler.yml` calls the same secured production endpoint and contains no duplicate publication business logic. It must remain lower-frequency than QStash (target approximately `7,22,37,52 * * * *` once QStash stability is proven). `.github/workflows/auto-news.yml` is legacy and is not the production scheduler.
 
-OpenAI environment:
-- `OPENAI_API_KEY` — optional.
-- `OPENAI_MODEL` — optional.
+All triggers call the same `runPublicationCycle`. Do not create a second worker path.
 
-Cloudflare Workers AI was audited against current official REST documentation but is not implemented because this repository has no verified Cloudflare account ID/token/configuration. Do not add fake credentials or endpoints.
+## Admin / Pipeline
+Admin source distribution is calculated from persisted published articles. It must show real publisher counts and percentages, not synthetic values. The Automation / News Pipeline tab must expose actual worker state, provider metadata, publication result, and timing.
 
-Article generation preserves factual-only fallback and backward compatibility. New articles may contain `generationProvider`, `generationModel`, `generationAt`, and `generationDurationMs`.
+Admin APIs require server-side authentication and authorization with the existing Google OAuth and `ADMIN_EMAILS` rules.
 
-## Article Safety
-AI output must have title, excerpt, and content. Output cleaning removes markdown fences/wrapper text and rejects placeholders, ellipsis, copied source-only output, and insufficient material. The prompt forbids fake quotes, reporters, interviews, witnesses, research, statistics, financial numbers, government statements, and fake chronology.
+## Timestamp / SEO / Search Invariants
+Keep existing canonical URLs, sitemap/news-sitemap timestamps, robots behavior, published-only search, article JSON-LD, image proportions, analytics, ads, and category/source filters intact.
 
-Historical repair remains Gemini-first and must skip overwrite when generation falls through to raw fallback.
-
-## Scheduler & Publication Cadence
-The preferred production timing engine is Vercel Cron when the project plan exposes a supported five-minute interval. The secure path is `/api/cron/news-publish` using `CRON_SECRET` and the same shared publication cycle.
-
-GitHub Actions on `main` is a fallback/watchdog only. Its workflow calls the secured Vercel endpoint and must not contain a second copy of worker business logic. Its schedule is deliberately lower-frequency than the primary target and exists to recover stale publication when Vercel Cron is unavailable or delayed.
-
-Target cadence remains approximately one publication per five minutes. Do not call the cadence verified until sequential real publication timestamps have been observed in production.
-
-## Public Search
-Canonical route: `/cari?q=keyword`.
-
-Search reads published articles only and scores:
-exact title > title contains > excerpt > content > category/source.
-Tie-break: newest publication first.
-
-`/cari` with empty query and no-result searches return HTTP 200. Search pages use `noindex, follow`, are not in sitemap/news sitemap, and do not include ads.
-
-## SEO Architecture
-`/sitemap.xml` contains the homepage, all public categories, and canonical published article URLs only.
-
-All sitemap `lastmod` values are generated as real `Date` values from article `updatedAt`, then `sitePublishedAt`, then `createdAt`. Category lastmod is the latest real article timestamp in that category. No `new Date()` freshness fabrication is used for published URLs.
-
-`/news-sitemap.xml` is a Google News sitemap limited to published articles from roughly the last two days and capped at 1000 URLs. It uses publication name `Berita Auto`, language `id`, real `sitePublishedAt`/`createdAt`, title, and canonical URL.
-
-`robots.txt` exposes both sitemap URLs and disallows private admin/API/auth/preview paths.
-
-Article pages retain canonical URLs, unique title/description, `NewsArticle` JSON-LD, publication/update dates, publisher, image, and main entity. Breadcrumb structured data should remain added when article JSON-LD is changed again.
-
-Public internal linking remains article -> category, article -> related articles, category -> article, homepage -> articles.
-
-## Timestamp Semantics
-`sourcePublishedAt` is the source publisher timestamp; `sitePublishedAt` is Berita Auto publication time; `updatedAt` is an actual content update timestamp when available.
-
-Public article metadata visually separates source and Berita Auto timestamps into distinct blocks. Compact cards show the publication time as `Terbit di Berita Auto` rather than placing two long timestamps side by side.
-
-## Admin Automation / News Pipeline
-`AdminWorkspace` contains a real pipeline monitor backed by `/api/admin/pipeline` and persisted worker state.
-
-When no worker is running, UI state is `IDLE` with last completed run. It must never invent progress, fake current stage, fake provider success, or expose secrets.
-
-Recent runs show status, stage, provider, publication result, and timestamp. Provider state is derived from actual worker metadata.
-
-## Advertising
-`components/AdSlot.jsx` remains reusable and unchanged from the verified redesign. Public phone number remains invisible; only the WhatsApp href retains the approved destination. Ads are not search results, sitemap entries, NewsArticle data, or popular articles.
-
-## Analytics
-Analytics uses Upstash Redis REST only when both Upstash variables are present. No fake analytics values are rendered when unavailable.
-
-## Security
-All admin APIs require authenticated authorized-admin email. Payloads have basic length/type validation. Secrets, database tokens, OAuth secrets, and provider keys are never returned to UI or logs.
+Sitemap timestamps must use real article timestamps. Search remains HTTP 200 for empty/no-result queries and remains `noindex, follow`.
 
 ## Git Data API Procedure
 1. Fetch latest target HEAD.
@@ -197,69 +131,26 @@ All admin APIs require authenticated authorized-admin email. Payloads have basic
 9. Re-fetch commit/ref and verify.
 10. Never overwrite worker-generated data commits.
 
-## Build & Verification
-Required when environment permits:
+## Build and Verification
+When the environment permits, run:
 - `npm ci --prefer-offline --no-audit`
 - `npm run build`
 - `node --check worker/run.js`
-- controlled AI failover tests
+- `node worker/source-verification.js`
+- existing tests/lint only if present in `package.json`
 - production route checks
-- real cron/trigger publication verification
+- real scheduler/publication verification
 
-If local npm execution is not available, Vercel/CI build evidence must be reported exactly rather than inferred.
+Do not claim a check passed without evidence.
 
-## DO NOT BREAK
-Google OAuth, `ADMIN_EMAILS`, shared Notes persistence, source/category distribution, source filters, recent-50 distribution, dominance warning, queue/pending behavior, one-article-per-run normal cadence, adaptive catch-up, canonical URLs, redirects, article image aspect ratio, analytics, ads, robots, sitemap, and non-force Git history.
+## Source Research Record
+The initial source research found official/known publisher feed endpoints for the active registry. Web validation showed ANTARA and Liputan6 endpoints returning XML to the fetch layer, while CNN Indonesia and CNBC Indonesia currently return HTTP 403 to the web fetcher. Historical Tempo RSS endpoints also return HTTP 403, so Tempo was not added to the active registry. Third-party feed directories were used only to discover candidate URLs, not as runtime ingestion sources.
 
-## Current Runtime Environment Names
-Production/application runtime may require:
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
-- `CRON_SECRET`
-- `GEMINI_API_KEY`
-- `GEMINI_MODEL`
-- `OPENAI_API_KEY`
-- `OPENAI_MODEL`
+## Security
+Never print or commit `CRON_SECRET`, Upstash tokens, QStash tokens, OAuth secrets, Gemini/OpenAI keys, or `.env` files. If a secret is found in repository history, treat it as a security issue without repeating its value.
 
-Never put actual values in source or documentation.
-
-## Project Work Log Baseline
-1. Public search 404 — resolved in current route implementation; retain regression coverage.
-2. Gemini live generation — Blocked until `GEMINI_API_KEY` existence can be verified and a real publication test can run.
-3. Publication cadence — Perlu Verifikasi until sequential production publication gaps are observed with the new trigger architecture.
-4. Authenticated admin visual/CRUD — Perlu Verifikasi unless an authorized Google session becomes available.
-5. SEO/news sitemap audit — Perlu Verifikasi until production XML is checked after the latest production deployment.
-6. Persistent news datastore migration — Perlu Verifikasi until Upstash runtime is proven in Production.
-7. Vercel five-minute Cron capability — Perlu Verifikasi because the current Vercel MCP does not expose the project plan/tier.
-8. Production deployment of the DB-backed publication commit — Perlu Verifikasi after the latest Git-integrated deployment/build completes.
-
-## Current Status
-✅ persistent admin Notes source code
-✅ shared Work Log source code
-✅ real pipeline telemetry source code
-✅ extensible Gemini/OpenAI provider registry
-✅ public `/cari` route implementation
-✅ normalized sitemap implementation
-✅ Google News sitemap implementation
-✅ robots sitemap exposure
-✅ timestamp separation CSS/card treatment
-✅ Git probe cleanup
-✅ DB-backed publication storage implementation
-✅ shared publication cycle and Redis publication lock
-✅ secured publication endpoint
-✅ GitHub fallback workflow that calls the secured endpoint
-⚠️ persistent database runtime still depends on verified Upstash credentials
-⚠️ Vercel five-minute Cron support/plan is not exposed by the available MCP
-⚠️ latest DB-backed application deployment has not yet reached READY after the initial build fix
-⚠️ publication cadence requires sequential production evidence after the new runtime is live
-⚠️ authenticated admin CRUD/visual verification requires an authorized session
-
-## Manual Setup
-If Upstash is not already configured in Vercel and GitHub Actions, use the existing project Upstash Redis database and set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` in the appropriate Vercel Production and GitHub Actions environments. Do not create a second database unless the existing backend cannot support the required persistence.
-
-Set `CRON_SECRET` in the same secure environment before enabling the Vercel Cron or GitHub fallback trigger. Do not send the secret through chat.
-
-If Gemini is not configured, add repository secret `GEMINI_API_KEY` and repository variable `GEMINI_MODEL`; never send the key through chat.
+## Definition of Done
+Multi-source ingestion, source isolation, cross-source dedupe, deterministic rotation, metadata separation, Redis persistence, build/tests, atomic commit, READY production deployment, runtime publication, multi-publisher production evidence, Admin Pipeline, scheduler evidence, and required documentation must all be verified before declaring completion.
 
 ## Source of Truth
-Current source code and production behavior win over historical conversation or documentation. Update this guide when architecture changes.
+Current source code and verified production behavior win over historical conversation or stale documentation. Update this guide when architecture changes.
