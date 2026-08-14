@@ -658,19 +658,6 @@
     "slug": "saudi-15-negara-teken-deklarasi-pembentukan-koalisi-maritim"
   },
   {
-    "title": "Pakai jas tree hole bottom di sidang tahunan MPR, ini yang ingin disampaikan Gibran",
-    "summary": "Wakil Presiden Gibran Rakabuming Raka tampil dengan elegan dan berwibawa melalui penggunaan jas model tree hole bottom dalam Sidang Tahunan MPR.Pengamat Mode Lisa Fitria menyampaikan model jas itu formal, namun dalam gaya ...",
-    "url": "https://jabar.antaranews.com/berita/702459/pakai-jas-tree-hole-bottom-di-sidang-tahunan-mpr-ini-yang-ingin-disampaikan-gibran",
-    "publishedAt": "Fri, 14 Aug 2026 13:52:00 +0700",
-    "sourceUrl": "https://jabar.antaranews.com/rss/lifestyle.xml",
-    "sourceName": "ANTARA Jabar Lifestyle",
-    "category": "Lifestyle",
-    "imageUrl": "https://cdn.antaranews.com/cache/255x170/2026/08/14/WhatsApp-Image-2026-08-14-at-09.21.34.jpeg",
-    "fingerprint": "51195cde79c10b5794750191",
-    "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 112
-  },
-  {
     "title": "Gajah Asia liar mendapat perawatan yang lebih baik di Yunnan",
     "summary": "\"Keluarga hidung pendek\" gajah Asia liar menarik perhatian dunia pada 2021 setelah menjelajah lebih ...",
     "url": "https://www.antaranews.com/berita/5694224/gajah-asia-liar-mendapat-perawatan-yang-lebih-baik-di-yunnan",
@@ -681,7 +668,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/CjkinzN000005_20260814_CBMFN0A001.jpg",
     "fingerprint": "9f5c7daefa888207f4f4b010",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 110
+    "priority": 110,
+    "slug": "gajah-asia-liar-mendapat-perawatan-yang-lebih-baik-di-yunnan"
   },
   {
     "title": "Timnas esports manfaatkan MPL sebagai uji tanding menuju Asian Games",
@@ -694,7 +682,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/06/21/upscalemedia-transformed-123.jpeg",
     "fingerprint": "edd500b701ad7fe081aba97f",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 104
+    "priority": 104,
+    "slug": "timnas-esports-manfaatkan-mpl-sebagai-uji-tanding-menuju-asian-games"
   },
   {
     "title": "Aksi kecam penistaan agama di Gedung OT Cengkareng picu kemacetan",
@@ -707,7 +696,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/IMG-20260814-WA0034.jpg",
     "fingerprint": "6c288e63810d3b37885c626b",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 100
+    "priority": 100,
+    "slug": "aksi-kecam-penistaan-agama-di-gedung-ot-cengkareng-picu-kemacetan"
   },
   {
     "title": "Anggota DPR: Bulog jadi badan otonom dapat perkuat peran negara",
@@ -720,7 +710,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/969BF212-CA12-42C6-A73D-8F7260DF2354.jpeg",
     "fingerprint": "ffb7163c9d1a8603c2e86fd0",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 100
+    "priority": 100,
+    "slug": "anggota-dpr-bulog-jadi-badan-otonom-dapat-perkuat-peran-negara"
   },
   {
     "title": "IWL dinilai jadi fondasi penting sepak bola putri Indonesia",
@@ -733,7 +724,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2025/06/11/bola-wanita-1.jpg",
     "fingerprint": "251a75b53799f64df0ea0e95",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 100
+    "priority": 100,
+    "slug": "iwl-dinilai-jadi-fondasi-penting-sepak-bola-putri-indonesia"
   },
   {
     "title": "Pemkab Bogor hapus denda PBB P2 peringati HUT Ke-81 RI",
@@ -746,7 +738,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/1003337235.jpg",
     "fingerprint": "de1d0ce82eee6b5c5bdf5412",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 100
+    "priority": 100,
+    "slug": "pemkab-bogor-hapus-denda-pbb-p2-peringati-hut-ke-81-ri"
   },
   {
     "title": "KBRI Tunis perkuat perdagangan RI-Tunisia lewat forum bisnis",
@@ -759,7 +752,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/408.jpg",
     "fingerprint": "9337db9c21449a4abb3804c7",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 100
+    "priority": 100,
+    "slug": "kbri-tunis-perkuat-perdagangan-ri-tunisia-lewat-forum-bisnis"
   },
   {
     "title": "Ini yang ingin ditegaskan Prabowo lewat jas double breasted di sidang tahunan MPR",
@@ -772,7 +766,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/255x170/2026/08/14/presiden-tiba-di-kompleks-parlemen-2840647.jpg",
     "fingerprint": "5432a6cdefb00475f09e18e8",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 82
+    "priority": 82,
+    "slug": "ini-yang-ingin-ditegaskan-prabowo-lewat-jas-double-breasted-di-sidang-tahunan-mpr"
   },
   {
     "title": "Samudra Hindia, halaman depan yang kurang terawat",
@@ -785,7 +780,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/12/tenda-5.jpeg",
     "fingerprint": "b3c9d45283283c4d5dd4da92",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 110
+    "priority": 110,
+    "slug": "samudra-hindia-halaman-depan-yang-kurang-terawat"
   },
   {
     "title": "MAXUS hadirkan dealer terintegrasi berkonsep 3S di Kota Malang",
@@ -798,7 +794,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/255x170/2026/08/14/1001420373.jpg",
     "fingerprint": "cd51233dcf956c741be2cbc4",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 104
+    "priority": 104,
+    "slug": "maxus-hadirkan-dealer-terintegrasi-berkonsep-3s-di-kota-malang"
   },
   {
     "title": "Penanganan obesitas tidak cukup hanya kurangi nasi",
@@ -811,7 +808,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/tempImage49pDUQ.jpg",
     "fingerprint": "2434cb60ffc01937ec7d320d",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 100
+    "priority": 100,
+    "slug": "penanganan-obesitas-tidak-cukup-hanya-kurangi-nasi"
   },
   {
     "title": "DPR: Riset perguruan tinggi perlu jadi dasar kebijakan berbasis data",
@@ -824,7 +822,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/1000179251.jpg",
     "fingerprint": "098be2f58f3321f98234c355",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 100
+    "priority": 100,
+    "slug": "dpr-riset-perguruan-tinggi-perlu-jadi-dasar-kebijakan-berbasis-data"
   },
   {
     "title": "Stjepan Loncar nikmati tempaan fisik selama TC di Thailand",
@@ -837,7 +836,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/07/29/Port-FC-imbang-lawan-Persija-Jakarta-290726-rzl-5_1.jpg",
     "fingerprint": "2a4d128b771cc99d3a4bce56",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 100
+    "priority": 100,
+    "slug": "stjepan-loncar-nikmati-tempaan-fisik-selama-tc-di-thailand"
   },
   {
     "title": "Pengamat: Reinvestasi keuntungan BUMN dorong pertumbuhan ekonomi",
@@ -850,7 +850,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2025/08/14/1000354561.jpg",
     "fingerprint": "9c8e4614a3b6d01e15ce3d26",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 100
+    "priority": 100,
+    "slug": "pengamat-reinvestasi-keuntungan-bumn-dorong-pertumbuhan-ekonomi"
   },
   {
     "title": "Anggota DPD Komeng apresiasi kinerja Danantara yang meningkat",
@@ -863,7 +864,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/DC316167-AEC0-431B-AD00-7E0780A3A199.jpeg",
     "fingerprint": "51f2f6a3e6390f8cc10f6797",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 70
+    "priority": 70,
+    "slug": "anggota-dpd-komeng-apresiasi-kinerja-danantara-yang-meningkat"
   },
   {
     "title": "Bilal Hasan hadapi Nilson Rojas pada laga debutnya di UFC",
@@ -876,7 +878,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/12/IMG_20260812_171540.jpg",
     "fingerprint": "bdc1dcce1b42af1fd4755d30",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 110
+    "priority": 110,
+    "slug": "bilal-hasan-hadapi-nilson-rojas-pada-laga-debutnya-di-ufc"
   },
   {
     "title": "Yaman berisiko kembali ke konflik berskala besar",
@@ -889,7 +892,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/YAMAN-BERISIKO-KEMBALI-KE-KONFLIK-BERSKALA-BESAR.jpg",
     "fingerprint": "0379071ecaa1f694cd21803f",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 100
+    "priority": 100,
+    "slug": "yaman-berisiko-kembali-ke-konflik-berskala-besar"
   },
   {
     "title": "Komisi VI DPR RI apresiasi pidato Presiden terkait capaian Danantara",
@@ -902,7 +906,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/20260814_133034-0.jpg",
     "fingerprint": "b85e652923c7724bfdbdc6a9",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 100
+    "priority": 100,
+    "slug": "komisi-vi-dpr-ri-apresiasi-pidato-presiden-terkait-capaian-danantara"
   },
   {
     "title": "Ferran Torres resmi bergabung ke PSG",
@@ -915,7 +920,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/255x170/2026/08/14/1000045150.jpg",
     "fingerprint": "95c48887bd65226efbb05ca9",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 35
+    "priority": 35,
+    "slug": "ferran-torres-resmi-bergabung-ke-psg"
   },
   {
     "title": "BI edukasi pengelolaan uang berkelanjutan melalui FERBI 2026",
@@ -928,7 +934,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/1000459365.jpg",
     "fingerprint": "e6177af1b046fc0170bd2d9f",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 100
+    "priority": 100,
+    "slug": "bi-edukasi-pengelolaan-uang-berkelanjutan-melalui-ferbi-2026"
   },
   {
     "title": "Suzuki Carry dijadikan mobil patroli kepolisian di Filipina",
@@ -941,7 +948,8 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/mobil-polisi-filipina.jpg",
     "fingerprint": "49bdb476b17498104b5401a7",
     "queuedAt": "2026-08-14T08:07:24.279Z",
-    "priority": 70
+    "priority": 70,
+    "slug": "suzuki-carry-dijadikan-mobil-patroli-kepolisian-di-filipina"
   },
   {
     "title": "Dubes Gerritsen: Belanda siap bantu Indonesia perkuat ketahanan pangan",
@@ -954,6 +962,319 @@
     "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/1000687745_1.jpg",
     "fingerprint": "0ee855c59102402b15c07bdb",
     "queuedAt": "2026-08-14T08:07:24.279Z",
+    "priority": 110,
+    "slug": "dubes-gerritsen-belanda-siap-bantu-indonesia-perkuat-ketahanan-pangan"
+  },
+  {
+    "title": "Arab Saudi tegaskan pentingnya hubungan strategis dengan Indonesia",
+    "summary": "Duta Besar (Dubes) Arab Saudi untuk Indonesia Faisal Abdullah Al Amoudi menegaskan bahwa hubungan Arab Saudi dan ...",
+    "url": "https://www.antaranews.com/berita/5694048/arab-saudi-tegaskan-pentingnya-hubungan-strategis-dengan-indonesia",
+    "publishedAt": "Fri, 14 Aug 2026 13:12:34 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/dunia-internasional.xml",
+    "sourceName": "ANTARA Dunia Internasional",
+    "category": "Internasional",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/WhatsApp-Image-2026-08-14-at-12.05.31_1.jpeg",
+    "fingerprint": "6b35da8deda5eda78993a307",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
     "priority": 110
+  },
+  {
+    "title": "Prabowo kenalkan Susanah dan Margarelitha, jamin bansos tepat sasaran",
+    "summary": "Presiden Prabowo Subianto menjamin program-program perlindungan sosial dan bantuan sosial (bansos) disalurkan tepat ...",
+    "url": "https://www.antaranews.com/berita/5694259/prabowo-kenalkan-susanah-dan-margarelitha-jamin-bansos-tepat-sasaran",
+    "publishedAt": "Fri, 14 Aug 2026 15:11:42 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/terkini.xml",
+    "sourceName": "ANTARA Terkini",
+    "category": "Politik",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/WhatsApp-Image-2026-08-14-at-13.04.22.jpeg",
+    "fingerprint": "fd6ab7a93bddff948c38f9b8",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 100
+  },
+  {
+    "title": "Peran pustakawan penting jaga memori kolektif di tengah arus digital",
+    "summary": "Ikatan Pustakawan Indonesia (IPI) menilai peran pustakawan semakin penting dalam menjaga memori kolektif, warisan ...",
+    "url": "https://www.antaranews.com/berita/5694255/peran-pustakawan-penting-jaga-memori-kolektif-di-tengah-arus-digital",
+    "publishedAt": "Fri, 14 Aug 2026 15:10:14 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/terkini.xml",
+    "sourceName": "ANTARA Terkini",
+    "category": "Nasional",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/IMG-20260814-WA0015_edit_2393760288364420.jpg",
+    "fingerprint": "ea2ca4e032cb7f26ce4942e8",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 100
+  },
+  {
+    "title": "Prabowo: Ekonomi hijau harus ciptakan nilai tambah bagi rakyat",
+    "summary": "Presiden Prabowo Subianto menegaskan pemerintah terus menggerakkan ekonomi hijau dengan membangun sistem nilai ekonomi ...",
+    "url": "https://www.antaranews.com/berita/5694152/prabowo-ekonomi-hijau-harus-ciptakan-nilai-tambah-bagi-rakyat",
+    "publishedAt": "Fri, 14 Aug 2026 14:16:08 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/terkini.xml",
+    "sourceName": "ANTARA Terkini",
+    "category": "Ekonomi",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/sidang-tahunan-mpr-ri-2026-2840909.jpg",
+    "fingerprint": "df3ddb8dab7048e4123128d6",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 100
+  },
+  {
+    "title": "Hasil liga Conference: Maarten Paes starter dan Ajax lolos ke babak play-off",
+    "summary": "Kiper Timnas Indonesia, Maarten Paes menjadi starter saat Ajax lolos play-off Liga Conference 2026/27 setelah main imbang 2-2 lawan klub Irlandia, Shelbourne FC pada leg kedua babak ketiga kualifikasi di Tolka Park, Dublin, pada ...",
+    "url": "https://jabar.antaranews.com/berita/702377/hasil-liga-conference-maarten-paes-starter-dan-ajax-lolos-ke-babak-play-off",
+    "publishedAt": "Fri, 14 Aug 2026 07:11:00 +0700",
+    "sourceUrl": "https://jabar.antaranews.com/rss/olahraga.xml",
+    "sourceName": "ANTARA Jabar Olahraga",
+    "category": "Olahraga",
+    "imageUrl": "https://cdn.antaranews.com/cache/255x170/2026/08/14/1000045185.jpg",
+    "fingerprint": "64aa7394a55bce1bef3b0619",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 35
+  },
+  {
+    "title": "Menlu Jepang akan kunjungi Timteng pekan depan terkait Selat Hormuz",
+    "summary": "Menteri Luar Negeri Jepang Toshimitsu Motegi akan mengunjungi Arab Saudi dan Oman pekan depan untuk membahas isu Selat ...",
+    "url": "https://www.antaranews.com/berita/5694047/menlu-jepang-akan-kunjungi-timteng-pekan-depan-terkait-selat-hormuz",
+    "publishedAt": "Fri, 14 Aug 2026 13:12:14 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/dunia-internasional.xml",
+    "sourceName": "ANTARA Dunia Internasional",
+    "category": "Internasional",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/05/30/thumbs_b_c_49f06390e9f625a57f94205b44c6c997.jpg",
+    "fingerprint": "00d02c0da246a1a7378830c9",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 110
+  },
+  {
+    "title": "Kepala Bappenas: MotoGP harus diintegrasikan dengan kawasan pariwisata",
+    "summary": "Menteri Perencanaan Pembangunan Nasional (PPN)/Kepala Badan Perencanaan Pembangunan Nasional (Bappenas) Rachmat Pambudy ...",
+    "url": "https://www.antaranews.com/berita/5694252/kepala-bappenas-motogp-harus-diintegrasikan-dengan-kawasan-pariwisata",
+    "publishedAt": "Fri, 14 Aug 2026 15:09:13 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/terkini.xml",
+    "sourceName": "ANTARA Terkini",
+    "category": "Politik",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/Bapppenas-ITDC.jpeg",
+    "fingerprint": "749db18d0035317532176145",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 100
+  },
+  {
+    "title": "Sambut HUT RI, BKKBN Kepri gelar dagang UPPKA dan beri nutrisi anak",
+    "summary": "ANTARA - Badan Kependudukan dan Keluarga Berencana Nasional (BKKBN) Provinsi Kepulauan Riau (Kepri), mengadakan gelar ...",
+    "url": "https://www.antaranews.com/video/5694173/sambut-hut-ri-bkkbn-kepri-gelar-dagang-uppka-dan-beri-nutrisi-anak",
+    "publishedAt": "Fri, 14 Aug 2026 14:59:07 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/terkini.xml",
+    "sourceName": "ANTARA Terkini",
+    "category": "Nasional",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/SAMBUT-HUT-RI-BKKBN-KEPRI-GELAR-DAGANG-UPPKA-DAN-BERI-NUTRISI-ANAK.jpg",
+    "fingerprint": "fa6619d0b9c0e751a9b88f78",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 100
+  },
+  {
+    "title": "Ekonom: DSI berpotensi beri dampak penguatan nilai tukar rupiah",
+    "summary": "Ekonom Bank Danamon Hosianna Situmorang menilai Danantara Sumber Daya Indonesia (DSI) berpotensi memberikan dampak ...",
+    "url": "https://www.antaranews.com/berita/5694085/ekonom-dsi-berpotensi-beri-dampak-penguatan-nilai-tukar-rupiah",
+    "publishedAt": "Fri, 14 Aug 2026 13:26:38 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/ekonomi-finansial.xml",
+    "sourceName": "ANTARA Ekonomi Finansial",
+    "category": "Ekonomi",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/07/21/realisasi-devisa-ekspor-batu-bara-2825571.jpg",
+    "fingerprint": "0d90bf6b688235d6cfbcc26c",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 100
+  },
+  {
+    "title": "Hasil Liga Europa: Benfica lolos ke play-off dan Rangers tersingkir",
+    "summary": "Klub Portugal, Benfica memastikan lolos ke babak play-off Liga Europa 2026/27 setelah bermain imbang 1-1 melawan Hearts pada leg kedua babak kualifikasi di Tynecastle Park, Edinburgh, Skotlandia, Jumat.Benfica berhasil melaju ...",
+    "url": "https://jabar.antaranews.com/berita/702375/hasil-liga-europa-benfica-lolos-ke-play-off-dan-rangers-tersingkir",
+    "publishedAt": "Fri, 14 Aug 2026 07:08:46 +0700",
+    "sourceUrl": "https://jabar.antaranews.com/rss/olahraga.xml",
+    "sourceName": "ANTARA Jabar Olahraga",
+    "category": "Olahraga",
+    "imageUrl": "https://cdn.antaranews.com/cache/255x170/2025/11/28/1000253522.jpg",
+    "fingerprint": "ecfafdf6dd3fd022584a804a",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 35
+  },
+  {
+    "title": "Dubes negara sahabat hadiri Sidang Tahunan MPR RI 2026",
+    "summary": "Sejumlah duta besar dan perwakilan negara sahabat, Jumat pagi, tiba di Kompleks Parlemen Jakarta untuk menghadiri ...",
+    "url": "https://www.antaranews.com/berita/5693645/dubes-negara-sahabat-hadiri-sidang-tahunan-mpr-ri-2026",
+    "publishedAt": "Fri, 14 Aug 2026 09:03:26 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/dunia-internasional.xml",
+    "sourceName": "ANTARA Dunia Internasional",
+    "category": "Internasional",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/presiden-tiba-di-kompleks-parlemen-2840643_1.jpg",
+    "fingerprint": "835a8b9b4c27984acdd2c961",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 45
+  },
+  {
+    "title": "Kemensos siapkan bantuan dan \"safe house\" bagi korban karhutla",
+    "summary": "Kementerian Sosial (Kemensos) telah menyiapkan penyaluran bantuan kebutuhan dasar dan layanan psikososial bagi warga ...",
+    "url": "https://www.antaranews.com/berita/5694235/kemensos-siapkan-bantuan-dan-safe-house-bagi-korban-karhutla",
+    "publishedAt": "Fri, 14 Aug 2026 15:04:51 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/terkini.xml",
+    "sourceName": "ANTARA Terkini",
+    "category": "Politik",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/1000235334.jpg",
+    "fingerprint": "a687c48da8febf2f6979f3b6",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 100
+  },
+  {
+    "title": "Lemak di perut tingkatkan risiko diabetes hingga penyakit jantung",
+    "summary": "Ketua Umum Pengurus Besar Perhimpunan Endokrinologi Indonesia (Perkeni) Prof. Dr. dr. Em Yunir, Sp.PD-KEMD mengingatkan ...",
+    "url": "https://www.antaranews.com/berita/5694227/lemak-di-perut-tingkatkan-risiko-diabetes-hingga-penyakit-jantung",
+    "publishedAt": "Fri, 14 Aug 2026 14:53:52 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/terkini.xml",
+    "sourceName": "ANTARA Terkini",
+    "category": "Nasional",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/tempImagegXOZ2S.jpg",
+    "fingerprint": "1494c3326e3d4d04ff55ed57",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 100
+  },
+  {
+    "title": "Pembiayaan kendaraan BSI tumbuh 12,40 persen capai Rp6,7 T per Juni",
+    "summary": "PT Bank Syariah Indonesia (Persero) Tbk mengungkapkan pembiayaan kendaraan syariah BSI OTO mencatatkan kinerja positif ...",
+    "url": "https://www.antaranews.com/berita/5694055/pembiayaan-kendaraan-bsi-tumbuh-1240-persen-capai-rp67-t-per-juni",
+    "publishedAt": "Fri, 14 Aug 2026 13:18:07 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/ekonomi-finansial.xml",
+    "sourceName": "ANTARA Ekonomi Finansial",
+    "category": "Ekonomi",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/WhatsApp-Image-2026-08-14-at-12.39.58.jpeg",
+    "fingerprint": "dd8d916469789695346fee40",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 100
+  },
+  {
+    "title": "Barcelona dan PSG sepakati transfer Ferran Torres",
+    "summary": "Barcelona dan Paris Saint-Germain (PSG) dikabarkan telah menyepakati transfer penyerang timnas Spanyol, Ferran Torres.Berdasarkan Diaro Sport, pada Jumat, kesepakatan transfer pencetak gol di final Piala Dunia 2026 itu sudah ...",
+    "url": "https://jatim.antaranews.com/berita/1090056/barcelona-dan-psg-sepakati-transfer-ferran-torres",
+    "publishedAt": "Fri, 14 Aug 2026 06:51:37 +0700",
+    "sourceUrl": "https://jatim.antaranews.com/rss/olahraga.xml",
+    "sourceName": "ANTARA Jatim Olahraga",
+    "category": "Olahraga",
+    "imageUrl": "https://cdn.antaranews.com/cache/255x170/2026/08/14/1000045150.jpg",
+    "fingerprint": "992f8f9809e650eb0d111595",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 35
+  },
+  {
+    "title": "Trump berlakukan tarif atas drone dan komponennya",
+    "summary": "Presiden Amerika Serikat Donald Trump telah memberlakukan tarif terhadap pesawat nirawak (drone) dan ...",
+    "url": "https://www.antaranews.com/berita/5693631/trump-berlakukan-tarif-atas-drone-dan-komponennya",
+    "publishedAt": "Fri, 14 Aug 2026 08:53:53 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/dunia-internasional.xml",
+    "sourceName": "ANTARA Dunia Internasional",
+    "category": "Internasional",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/01/29/reapera.jpg",
+    "fingerprint": "8356ed9d10c0663208c4f121",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 45
+  },
+  {
+    "title": "Prabowo: Negara tanggung iuran JKN 96,8 juta warga tak mampu",
+    "summary": "Presiden Prabowo Subianto mengatakan negara menanggung penuh iuran Jaminan Kesehatan Nasional (JKN) bagi 96,8 juta ...",
+    "url": "https://www.antaranews.com/berita/5694229/prabowo-negara-tanggung-iuran-jkn-968-juta-warga-tak-mampu",
+    "publishedAt": "Fri, 14 Aug 2026 15:01:24 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/terkini.xml",
+    "sourceName": "ANTARA Terkini",
+    "category": "Politik",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/1001307804.jpg",
+    "fingerprint": "5ac4ad1d538d6dd9eb6b5344",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 100
+  },
+  {
+    "title": "Lomba HUT 81 RI di Lapas Cipinang jadi ruang kebersamaan warga binaan",
+    "summary": "Warga binaan di Lapas Kelas I Cipinang, Jakarta Timur (Jaktim) menilai beragam lomba yang digelar dalam rangka ...",
+    "url": "https://www.antaranews.com/berita/5694220/lomba-hut-81-ri-di-lapas-cipinang-jadi-ruang-kebersamaan-warga-binaan",
+    "publishedAt": "Fri, 14 Aug 2026 14:52:34 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/terkini.xml",
+    "sourceName": "ANTARA Terkini",
+    "category": "Nasional",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/InShot_20260814_144301246.jpg",
+    "fingerprint": "f454c4ff4855ce9f9326dbeb",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 100
+  },
+  {
+    "title": "Ekonom nilai komposisi pertumbuhan Indonesia makin didorong investasi",
+    "summary": "Ekonom Bank Danamon Hosianna Situmorang menilai komposisi pertumbuhan ekonomi Indonesia ke depan akan semakin banyak ...",
+    "url": "https://www.antaranews.com/berita/5694027/ekonom-nilai-komposisi-pertumbuhan-indonesia-makin-didorong-investasi",
+    "publishedAt": "Fri, 14 Aug 2026 12:58:35 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/ekonomi-finansial.xml",
+    "sourceName": "ANTARA Ekonomi Finansial",
+    "category": "Ekonomi",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/1001307545.jpg",
+    "fingerprint": "63e3a4f02c366ef83fb0cf21",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 70
+  },
+  {
+    "title": "Ajax lolos babak play-off",
+    "summary": "Kiper Timnas Indonesia, Maarten Paes menjadi starter saat Ajax lolos play-off Liga Conference 2026/27 setelah main imbang 2-2 lawan klub Irlandia, Shelbourne FC pada leg kedua babak ketiga kualifikasi di Tolka Park, Dublin, pada ...",
+    "url": "https://jatim.antaranews.com/berita/1090053/ajax-lolos-babak-play-off",
+    "publishedAt": "Fri, 14 Aug 2026 06:27:46 +0700",
+    "sourceUrl": "https://jatim.antaranews.com/rss/olahraga.xml",
+    "sourceName": "ANTARA Jatim Olahraga",
+    "category": "Olahraga",
+    "imageUrl": "https://cdn.antaranews.com/cache/255x170/2026/08/14/1000045185.jpg",
+    "fingerprint": "fcae1922e52ab4aa72d2517f",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 35
+  },
+  {
+    "title": "Palestina desak AS hentikan serangan Israel di Tepi Barat",
+    "summary": "Kementerian Luar Negeri Palestina, Kamis (13/8), mendesak masyarakat internasional dan Amerika Serikat untuk ...",
+    "url": "https://www.antaranews.com/berita/5693624/palestina-desak-as-hentikan-serangan-israel-di-tepi-barat",
+    "publishedAt": "Fri, 14 Aug 2026 08:40:24 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/dunia-internasional.xml",
+    "sourceName": "ANTARA Dunia Internasional",
+    "category": "Internasional",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/06/10/CjkinzN000008_20260610_CBMFN0A002a.jpg",
+    "fingerprint": "9ffbffc8461d85ab70e87383",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 45
+  },
+  {
+    "title": "Kemdiktisaintek perkuat transformasi kampus guna capai Indonesia Emas",
+    "summary": "Kementerian Pendidikan Tinggi, Sains, dan Teknologi (Kemdiktisaintek) terus memperkuat transformasi pendidikan tinggi, ...",
+    "url": "https://www.antaranews.com/berita/5694228/kemdiktisaintek-perkuat-transformasi-kampus-guna-capai-indonesia-emas",
+    "publishedAt": "Fri, 14 Aug 2026 14:56:22 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/terkini.xml",
+    "sourceName": "ANTARA Terkini",
+    "category": "Politik",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/07/09/IMG_20260709_100231.jpg_1.jpeg",
+    "fingerprint": "ca7b18762e9e528672e06b32",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 100
+  },
+  {
+    "title": "Tim SAR kerahkan tiga kapal dan helikopter cari korban KMP Yasmin",
+    "summary": "Tim SAR gabungan mengerahkan tiga kapal dan satu helikopter dalam melakukan pencarian lima korban yang diduga masih ...",
+    "url": "https://www.antaranews.com/berita/5694209/tim-sar-kerahkan-tiga-kapal-dan-helikopter-cari-korban-kmp-yasmin",
+    "publishedAt": "Fri, 14 Aug 2026 14:48:01 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/terkini.xml",
+    "sourceName": "ANTARA Terkini",
+    "category": "Nasional",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/1001815095.jpg",
+    "fingerprint": "cf5d10154f8cf36d4f942f97",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 100
+  },
+  {
+    "title": "IHSG menguat, pengamat nilai pidato Presiden pacu minat beli investor",
+    "summary": "Pengamat pasar modal Elandry Pratama menyampaikan bahwa penguatan Indeks Harga Saham Gabungan (IHSG) salah satunya ...",
+    "url": "https://www.antaranews.com/berita/5693925/ihsg-menguat-pengamat-nilai-pidato-presiden-pacu-minat-beli-investor",
+    "publishedAt": "Fri, 14 Aug 2026 11:49:52 +0700",
+    "sourceUrl": "https://www.antaranews.com/rss/ekonomi-finansial.xml",
+    "sourceName": "ANTARA Ekonomi Finansial",
+    "category": "Ekonomi",
+    "imageUrl": "https://cdn.antaranews.com/cache/800x533/2026/08/14/Pidato-Presiden-Prabowo-di-Sidang-Tahunan-MPR-140826-Dom-2_1.jpg",
+    "fingerprint": "5a03bbaca43022d66094bc87",
+    "queuedAt": "2026-08-14T08:12:07.967Z",
+    "priority": 70
   }
 ]
