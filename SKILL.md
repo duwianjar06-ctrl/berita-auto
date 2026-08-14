@@ -4,7 +4,7 @@
 Repository: `projectdaaw-bot/berita-auto`
 Production: `https://berita-auto.vercel.app`
 Admin: `https://berita-auto.vercel.app/admin-berita`
-Stack: Next.js 15.5.7, React 19.1, NextAuth v5 beta, Node 22 for Actions.
+Stack: Next.js 15.5.7, React 19.1, NextAuth v5 beta, Node 22 in GitHub Actions.
 
 ## Branch Strategy
 Application: `feature/auto-news-mvp`
@@ -12,190 +12,190 @@ Scheduler/default: `main`
 Production branch: `feature/auto-news-mvp`
 Never force-push or force-update refs.
 
-## Architecture
-Official RSS -> normalize/dedupe/classify -> pending queue (`data/pending-articles.json`) -> select one -> source material -> Gemini/OpenAI/factual fallback -> image enrichment -> published store (`data/articles.json`) -> Next.js/Vercel.
+## Core Architecture
+Official RSS -> normalize/dedupe/classify -> pending queue -> select one -> source material -> provider registry (Gemini -> optional OpenAI) -> factual fallback -> image enrichment -> `data/articles.json`.
 
-Ingestion and publication remain separate. Worker intake may add 24 or 48 candidates; one worker run publishes at most one article.
+`data/articles.json` and `data/pending-articles.json` remain the worker publication stores. Pending candidates are never public. One worker run publishes at most one article.
 
 ## Queue and Publication
-Configuration in `worker/strategy.js`:
-- normal ingestion max: 24
-- catch-up ingestion max: 48
-- queue target: 60
-- low watermark: 30
-- queue max: 120
-- max publications per run: 1
-- freshness cutoff: 12 hours
-- RSS concurrency: 8
-- AI timeout: 18s
-- source material timeout: 5s
+Configuration remains in `worker/strategy.js`:
+- normal ingestion max 24
+- catch-up ingestion max 48
+- queue target 60
+- low watermark 30
+- queue max 120
+- max publications per run 1
+- freshness cutoff 12 hours
+- RSS concurrency 8
+- AI timeout 18s
+- source material timeout 5s
 
-Production cron: `2-59/5 * * * *`.
-Pending candidates are not public and are excluded from homepage, categories, article reads, analytics ranking, sitemap, and admin published distribution. A candidate leaves pending only after successful publication.
+Canonical GitHub schedule remains `2-59/5 * * * *` with concurrency group `auto-news` and no overlapping writer. GitHub schedule dispatch jitter is treated separately from worker runtime.
 
-## Sources and Categories
-`lib/sources.js` + `lib/sources-extra.js` define the official/reliable RSS source set. Never invent RSS URLs.
-Categories: Nasional, Politik, Ekonomi, Bisnis, Internasional, Teknologi, Olahraga, Hiburan, Lifestyle, Otomotif, Sains, Daerah.
-`worker/category.js` uses dedicated-feed confidence plus contextual keyword scoring.
+## Shared Admin Notes
+`components/admin/AdminNotes.jsx` is now a thin client wrapper around `AdminWorkspace` and does not use localStorage as the source of truth.
 
-## AI Article Generation Providers
-`lib/ai.js` is the single provider/fallback path used by the publication worker and historical repair.
-
-Provider order:
-1. Gemini primary when `GEMINI_API_KEY` is configured.
-2. OpenAI secondary when `OPENAI_API_KEY` is configured.
-3. Factual non-AI fallback.
-
-Cloudflare Workers AI is not implemented because no current project credential/configuration justified adding another provider.
-
-### Gemini
+Persistent backend: existing Upstash Redis REST configuration, reused from the project analytics persistence pattern.
 Environment:
-- `GEMINI_API_KEY` — GitHub Actions secret only; never commit or log it.
-- `GEMINI_MODEL` — GitHub Actions repository variable; defaults to `gemini-2.5-flash-lite`.
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
 
-The default model is currently valid and supports structured output. Google currently lists a shutdown date of October 16, 2026 and recommends `gemini-3.1-flash-lite`, so `GEMINI_MODEL` must remain configurable and should be migrated before that date.
+Note model supports:
+`id`, `title`, `content`, `createdBy`, `createdByEmail`, `updatedBy`, `updatedByEmail`, `isPinned`, `createdAt`, `updatedAt`, optional `deletedAt`.
 
-Gemini is called through the Google Generative Language API with `x-goog-api-key`. Structured JSON output requests `title`, `excerpt`, and `content`.
+All notes APIs are server-side protected with `auth()` plus `ADMIN_EMAILS`. CRUD and pin/unpin use API routes under `/api/admin/notes`. All authorized admins read the same records.
 
-### OpenAI
-Environment:
-- `OPENAI_API_KEY` — optional secret.
-- `OPENAI_MODEL` — optional repository variable; default `gpt-4o-mini`.
+Legacy localStorage notes are eligible for a one-time import after login. The migration flag may live in localStorage, but the note data source of truth remains the database. Duplicate legacy notes are skipped using title/content signatures.
 
-OpenAI is secondary only and is never a publication blocker.
+If Upstash credentials are absent, notes APIs fail closed with HTTP 503 rather than silently falling back to localStorage.
 
-### Provider failure behavior
-Provider failures are classified as rate-limited, timeout, server error, invalid response, unavailable, or generic failure. No infinite retries. A failed Gemini call moves to OpenAI when configured, then to factual fallback. A provider failure never changes the one-publication-per-run rule.
+## Project Work Log
+The Admin Workspace has `Catatan`, `Pekerjaan & Perbaikan`, and `Automation / News Pipeline` tabs.
 
-No API response body or credential is logged. Logs use safe status labels such as `provider=gemini status=rate_limited` and `provider=fallback status=used`.
+Work Log model supports:
+- title, description, type, status, priority
+- createdBy, updatedBy, assignedTo
+- problem, fixDescription, verificationResult, blocker
+- commitSha, deploymentId
+- createdAt, updatedAt, resolvedAt
 
-### Article validation
-AI output must contain non-empty title, excerpt, and content. The validator removes markdown JSON fences/wrapper text, rejects placeholders and artificial `...`, requires multiple paragraphs based on material length, rejects content that is effectively copied source material, and requires sufficient length when factual material is sufficient.
+Types: Feature, Bug, Improvement, SEO, Scheduler, AI, UI, Deployment, Infrastructure, Security, Other.
 
-The prompt forbids fabricated quotes, interviewees, reporters, eyewitnesses, locations, research, statistics, financial figures, government statements, chronology, or claims of on-location reporting. Direct quotes may only survive when actually present in source material.
+Statuses: Belum Dikerjakan, Sedang Dikerjakan, Sudah Diperbaiki, Sudah Disesuaikan, Perlu Verifikasi, Blocked, Gagal, Selesai.
 
-Returned metadata:
-- `generationProvider`
-- `generationModel`
-- `generationAt`
+Priority: Low, Normal, High, Critical.
 
-Existing articles without these fields remain backward-compatible.
+Status semantics: code written is not completion; build success is still verification work; a production-ready deployment without route verification remains `Perlu Verifikasi`; `Blocked` is reserved for real external dependencies; `Selesai` requires production evidence.
 
-### Factual non-AI fallback
-Fallback uses only available factual pieces: article title, RSS summary, extracted source-material paragraphs, source attribution, and source URL. It does not invent facts. When material is insufficient, the fallback remains short rather than fabricating detail.
+Known real issues are represented as stable baseline IDs and are not duplicated on every admin visit.
 
-## Historical Article Repair
-`worker/repair.js` detects suspiciously short or ellipsis-truncated articles and calls the same Gemini -> OpenAI -> fallback generation path.
-Historical repair is safer than normal publishing: if generation ends in `fallback`, repair is skipped and the historical article is not overwritten with a raw/non-AI replacement.
-Command: `npm run news:repair`.
+## AI Provider Architecture
+`lib/ai-providers.js` defines the normalized provider registry and interface: `name`, `modelName`, `isConfigured`, `generate`, `timeoutMs`.
 
-## Homepage Editorial Intro
-The homepage `BERITA HARI INI` section is an editorial introduction explaining the multi-source value proposition without claiming complete internet coverage.
+Active order:
+1. Gemini primary when `GEMINI_API_KEY` exists.
+2. OpenAI optional secondary when configured.
+3. factual non-AI fallback.
 
-Current direction: explain that important news from various public sources is available in one place, reduce the need to open many publisher sites, and show compact supporting indicators.
+Provider errors normalize into safe classes such as rate limit, timeout, server error, auth, invalid response, unavailable, or unknown. No retry storm.
 
-Dynamic source count is computed from current published `sourceName` values. Category count uses the existing category architecture. No source count is hardcoded.
+Gemini environment:
+- `GEMINI_API_KEY` — GitHub Actions secret; never commit/log.
+- `GEMINI_MODEL` — repository variable; defaults to `gemini-2.5-flash-lite`.
 
-The intro uses CSS/SVG-style geometry only, with subtle fade/stagger motion. It must respect `prefers-reduced-motion`, remain readable on mobile, and avoid fake `LIVE` indicators.
+OpenAI environment:
+- `OPENAI_API_KEY` — optional.
+- `OPENAI_MODEL` — optional.
 
-## Advertising UI Policy
-`components/AdSlot.jsx` is the reusable advertising component for leaderboard, rectangle/sidebar, inline-article, and footer placements.
+Cloudflare Workers AI was audited against current official REST documentation but is not implemented because this repository has no verified Cloudflare account ID/token/configuration. Do not add fake credentials or endpoints. citeturn236447search0turn236447search5
 
-Public ad copy should be professional and clearly labeled `IKLAN`. The existing WhatsApp number must never appear as visible text. The number may remain only inside the approved WhatsApp href.
+Article generation preserves factual-only fallback and backward compatibility. New articles may contain `generationProvider`, `generationModel`, `generationAt`, and `generationDurationMs`.
 
-CTA label: `Pasang Iklan ↗` or equivalent professional wording. External WhatsApp links opened in a new tab use `rel="noopener noreferrer"`.
+## Article Safety
+AI output must have title, excerpt, and content. Output cleaning removes markdown fences/wrapper text and rejects placeholders, ellipsis, copied source-only output, and insufficient material. The prompt forbids fake quotes, reporters, interviews, witnesses, research, statistics, financial numbers, government statements, and fake chronology.
 
-`components/ads.css` supplies the lightweight shared ad visual system: gradients, abstract editorial document/spotlight shapes, soft transitions, responsive stacking, and reduced-motion support. No stock image, GIF, video, heavy animation library, or copyrighted visual asset is required.
+Historical repair remains Gemini-first and must skip overwrite when generation falls through to raw fallback.
 
-Ads are not articles. They must not be included in public search results, sitemap entries, NewsArticle JSON-LD, or popular-article ranking. Existing search, sitemap, and analytics implementations therefore remain unchanged.
+## Scheduler & Publication Cadence
+`main/.github/workflows/feature-branch-scheduler.yml` executes the application branch with one writer and non-force push. It now passes Upstash REST credentials to the worker for pipeline telemetry.
 
-## Article Detail
-`app/berita/[slug]/page.jsx` renders every body paragraph and preserves source attribution, source time, site publication time, related articles, ads, share links, and NewsArticle JSON-LD. Do not introduce body truncation.
+Worker telemetry is persisted through `lib/pipeline.js` when Upstash exists. Stages include reading state, discovering, normalizing, queuing, selecting, image processing, paraphrasing, validating, and publishing. Persisted run summaries include provider, AI duration, worker duration, queue count, candidates found, accepted/rejected counts, status, and last error.
 
-The article-detail image aspect-ratio policy is an existing compatibility requirement: preserve the source image proportions rather than redesigning article hero media for the homepage treatment.
+Target cadence remains approximately one publication per five minutes. GitHub schedule dispatch is an external platform constraint: previous audit showed normal job execution of roughly 30 seconds after dispatch, while some scheduled runs were delayed by platform dispatch. Do not claim scheduler cadence is fixed until multiple sequential publication intervals are empirically observed.
+
+## Public Search
+Canonical route: `/cari?q=keyword`.
+
+Search reads published articles only and scores:
+exact title > title contains > excerpt > content > category/source.
+Tie-break: newest publication first.
+
+`/cari` with empty query and no-result searches return HTTP 200. Search pages use `noindex, follow`, are not in sitemap/news sitemap, and do not include ads.
+
+## SEO Architecture
+`/sitemap.xml` contains the homepage, all public categories, and canonical published article URLs only.
+
+All sitemap `lastmod` values are generated as real `Date` values from article `updatedAt`, then `sitePublishedAt`, then `createdAt`. Category lastmod is the latest real article timestamp in that category. No `new Date()` freshness fabrication is used for published URLs.
+
+`/news-sitemap.xml` is a Google News sitemap limited to published articles from roughly the last two days and capped at 1000 URLs. It uses publication name `Berita Auto`, language `id`, real `sitePublishedAt`/`createdAt`, title, and canonical URL.
+
+`robots.txt` exposes both sitemap URLs and disallows private admin/API/auth/preview paths.
+
+Article pages retain canonical URLs, unique title/description, `NewsArticle` JSON-LD, publication/update dates, publisher, image, and main entity. Breadcrumb structured data should remain added when article JSON-LD is changed again.
+
+Public internal linking remains article -> category, article -> related articles, category -> article, homepage -> articles.
+
+## Timestamp Semantics
+`sourcePublishedAt` is the source publisher timestamp; `sitePublishedAt` is Berita Auto publication time; `updatedAt` is an actual content update timestamp when available.
+
+Public article metadata now visually separates source and Berita Auto timestamps into distinct blocks. Compact cards show the publication time as `Terbit di Berita Auto` rather than placing two long timestamps side by side.
+
+## Admin Automation / News Pipeline
+`AdminWorkspace` contains a real pipeline monitor backed by `/api/admin/pipeline` and persisted worker state.
+
+When no worker is running, UI state is `IDLE` with last completed run. It must never invent progress, fake current stage, fake provider success, or expose secrets.
+
+Recent runs show status, stage, provider, publication result, and timestamp. Provider state is derived from actual worker metadata.
+
+## Advertising
+`components/AdSlot.jsx` remains reusable and unchanged from the verified redesign. Public phone number remains invisible; only the WhatsApp href retains the approved destination. Ads are not search results, sitemap entries, NewsArticle data, or popular articles.
 
 ## Analytics
-Analytics is optional and uses Upstash Redis REST only when both `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` exist. No fake analytics values are rendered when unavailable.
+Analytics uses Upstash Redis REST only when both Upstash variables are present. No fake analytics values are rendered when unavailable.
 
-## Admin
-`/admin-berita` remains protected by Google OAuth and `ADMIN_EMAILS`. Personal Notes remains `components/admin/AdminNotes.jsx`.
-
-### Admin Distribution Dashboard
-The existing `Distribusi Kategori` remains first, with `Distribusi Sumber Berita` directly below it. Source distribution is derived from real published `article.sourceName` data through `lib/admin-source-distribution.js`, excludes pending candidates, handles missing source names as `Sumber tidak diketahui`, sorts by count, and supports source filtering with existing query-state. Recent-50 distribution and >50% dominance warning are preserved.
-
-No rebuild of the source distribution architecture is permitted unless a new requirement actually needs it.
-
-### Admin News Pipeline
-No dedicated Admin News Pipeline component was present in the audited current repository. Do not invent mock pipeline states. If a real pipeline monitor is added later, AI provider/model/state must derive from actual worker state or published `generationProvider` metadata and must never expose secrets.
-
-## Persistence and Vercel
-`lib/storage.js` reads published/pending JSON from the feature branch raw GitHub content. Git remains the persistence channel for worker publication.
-`vercel.json` suppresses UI rebuilds for data-only changes to `data/articles.json` and `data/pending-articles.json`; code commits still deploy.
-
-## Scheduler
-Canonical workflow: `main/.github/workflows/feature-branch-scheduler.yml`.
-
-The scheduler checks out `feature/auto-news-mvp`, uses Node 22, runs `npm ci --prefer-offline --no-audit`, runs `npm run news:run`, stages only published/pending data, rebases on the latest feature branch, and pushes non-force.
-
-Gemini scheduler env:
-- `GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}`
-- `GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}`
-
-Optional OpenAI scheduler env:
-- `OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}`
-- `OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}`
-
-Never claim a secret is configured unless a connector exposes proof. Code readiness and secret configuration are separate states.
+## Security
+All admin APIs require authenticated authorized-admin email. Payloads have basic length/type validation. Secrets, database tokens, OAuth secrets, and provider keys are never returned to UI or logs.
 
 ## Git Data API Procedure
 1. Fetch latest target HEAD.
-2. Fetch current files/tree.
+2. Read current tree/files.
 3. Create blobs.
-4. Create tree on current base.
+4. Create a tree on the latest base tree.
 5. Re-fetch HEAD immediately before commit/ref update.
-6. If HEAD changed, rebuild tree/commit on newest HEAD.
+6. Rebuild if HEAD changed.
 7. Create commit.
 8. Update ref with `force=false` only.
-9. Re-fetch committed files/commit and verify.
+9. Re-fetch commit/ref and verify.
 10. Never overwrite worker-generated data commits.
 
-## Build and Test
-Required commands:
+## Build & Verification
+Required when environment permits:
 - `npm ci --prefer-offline --no-audit`
 - `npm run build`
-- `npm run news:run`
-- `npm run news:repair`
+- controlled AI failover tests
+- production route checks
 
-Controlled AI tests cover Gemini success, missing key, 429, timeout, invalid response, 5xx, optional OpenAI failover, and factual fallback without consuming production quota.
+If local npm execution is not available, Vercel/CI build evidence must be reported exactly rather than inferred.
 
 ## DO NOT BREAK
-Google OAuth, `ADMIN_EMAILS`, Personal Notes, article IDs/fingerprints/slugs, canonical URLs, old redirects, RSS/pending dedupe, one-at-a-time publisher, sitemap, robots, Google verification, source distribution, source filtering, analytics, carousel, article full content, image behavior, production branch, and non-force Git history.
+Google OAuth, `ADMIN_EMAILS`, shared Notes persistence, source/category distribution, source filters, recent-50 distribution, dominance warning, queue/pending behavior, one-article-per-run, canonical URLs, redirects, article image aspect ratio, analytics, ads, robots, sitemap, and non-force Git history.
+
+## Project Work Log Baseline
+1. Public search 404 — currently being verified after route implementation.
+2. Gemini live generation — Blocked until `GEMINI_API_KEY` existence can be verified and a real publication test can run.
+3. Publication cadence — Perlu Verifikasi until sequential production publication gaps are observed.
+4. Authenticated admin visual/CRUD — Perlu Verifikasi unless an authorized Google session becomes available.
+5. SEO/news sitemap audit — Perlu Verifikasi until production XML is checked after the deployment.
+
+## Current Status
+✅ persistent admin Notes source code
+✅ shared Work Log source code
+✅ real pipeline telemetry source code
+✅ extensible Gemini/OpenAI provider registry
+✅ public `/cari` route implementation
+✅ normalized sitemap implementation
+✅ Google News sitemap implementation
+✅ robots sitemap exposure
+✅ timestamp separation CSS/card treatment
+⚠️ persistent database runtime still depends on verified Upstash credentials
+⚠️ live Gemini generation still depends on verified `GEMINI_API_KEY`
+⚠️ publication cadence requires sequential production evidence after new telemetry is live
+⚠️ authenticated admin CRUD/visual verification requires an authorized session
+
+## Manual Setup
+If Upstash is not already configured in Vercel and GitHub Actions, create/use the existing project Upstash Redis database and set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` in the appropriate Vercel Production and GitHub Actions environments. Do not create a second database unless the existing backend cannot support the required persistence.
+
+If Gemini is not configured, add repository secret `GEMINI_API_KEY` and repository variable `GEMINI_MODEL`; never send the key through chat.
 
 ## Source of Truth
-Current repository code wins over conversation history. Documentation must be updated when architecture changes.
-
-## Current Implementation Status
-✅ multi-source RSS ingestion and queue
-✅ queue target 60 / low watermark 30 / max 120
-✅ one publication per worker run
-✅ existing category/source distribution and source filtering
-✅ recent-50 source distribution and domination warning
-✅ Gemini-first article generation code
-✅ optional OpenAI secondary path
-✅ factual non-AI fallback
-✅ generation metadata on new publications
-✅ historical repair refuses fallback overwrite
-✅ redesigned `BERITA HARI INI` homepage intro
-✅ reusable responsive AdSlot redesign
-✅ public ad phone number removed from AdSlot and Footer markup
-✅ reduced-motion rules for new intro/ad styles
-⚠️ live Gemini generation requires `GEMINI_API_KEY` to be configured in GitHub Actions; connector cannot prove secret existence
-⚠️ `GEMINI_MODEL` repository-variable existence is not exposed by the available connector; code default is `gemini-2.5-flash-lite`
-⚠️ no dedicated Admin News Pipeline component exists in the audited repository, so no mock provider panel was added
-
-## Verification Notes
-Latest production HTML was checked for the homepage. The new `BERITA HARI INI` intro and redesigned AdSlot markup were present, and the public phone number was removed from the footer before the final deployment.
-Production visual screenshot verification was not available because no browser/screenshot tool was exposed in this session; route/HTML verification and Vercel build verification were used instead.
-
-## Last Verified
-Verification is tied to the latest READY Production deployment and the current `feature/auto-news-mvp` branch HEAD. Re-fetch Git HEAD and Vercel deployment metadata before claiming a newer release.
+Current source code and production behavior win over historical conversation or documentation. Update this guide when architecture changes.

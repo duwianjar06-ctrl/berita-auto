@@ -1,22 +1,22 @@
 # Berita Auto Agent Instructions
 
 1. Read `/SKILL.md` completely before editing.
-2. Fetch the latest repository and confirm the target branch before every change.
-3. Application branch: `feature/auto-news-mvp`.
-4. Scheduler/default branch: `main`.
-5. Production branch: `feature/auto-news-mvp`.
-6. Never force-push or force-update a ref.
-7. Re-fetch HEAD immediately before `update_ref`; rebuild the tree if HEAD changed.
-8. Preserve Google OAuth, `ADMIN_EMAILS`, Personal Notes, canonical URLs, old redirects, RSS/pending dedupe, one-at-a-time publishing, robots, sitemap, and advertising CTA.
-9. Run real build/test commands when possible and report exact failures.
-10. Never expose or commit secrets.
-11. Pending candidates live in `data/pending-articles.json`; published articles live in `data/articles.json`.
-12. Ingestion is separate from publication. A worker run publishes at most one article.
-13. Never fabricate reader views, geo data, quotations, reporters, interviews, facts, or credentials.
-14. Analytics code is optional and activates only when `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are configured.
-15. Admin source distribution must be derived from real published article `sourceName` data; never hardcode source counts or include pending candidates.
-16. Source distribution and Source Monitor have different semantics: distribution measures published article contribution, while Source Monitor measures feed/source health and fetching state.
-17. Gemini is the primary article-generation provider; OpenAI is optional secondary; AI failures must never stop the one-article publication run because factual non-AI fallback is the final path.
-18. Provider metadata must reflect the actual generation path; never fabricate AI success, model names, credentials, or pipeline status.
-19. Public advertising UI must never render the WhatsApp phone number as visible text; keep the existing number only inside the CTA href.
-20. Read `/SKILL.md` for the exact Git Data API, scheduler, queue, analytics, AI generation, deployment, maintenance, advertising, and admin distribution procedures.
+2. Fetch latest HEAD for the target branch immediately before making commits and immediately before updating refs.
+3. Application branch: `feature/auto-news-mvp`; scheduler/default: `main`; production: `feature/auto-news-mvp`.
+4. Never force-push or force-update refs. Use `force=false`.
+5. Preserve Google OAuth, `ADMIN_EMAILS`, shared persistent Notes, source/category distribution, queue/pending data, one-at-a-time publishing, canonical URLs, article image proportions, sitemap/robots, analytics, and verified advertising behavior.
+6. Never overwrite `data/articles.json` or `data/pending-articles.json` from an application feature commit.
+7. Admin APIs must authenticate and authorize server-side. Never treat UI hiding as authorization.
+8. Persistent Notes/Work Log require the existing approved database backend; never fall back to localStorage as source of truth, filesystem, memory globals, or Vercel ephemeral storage.
+9. Never mark a Work Log item `Selesai` without production evidence. Keep unresolved blockers visible.
+10. Pipeline telemetry must come from actual worker state. Never fake progress, provider success, timing, queue counts, or scheduler metrics.
+11. Gemini is primary; OpenAI is optional secondary; factual fallback is mandatory. Provider metadata must reflect the real generation path.
+12. Never expose or commit API keys, OAuth secrets, database tokens, or raw provider responses containing credentials.
+13. Use bounded retries/timeouts only. Keep the one-publication-per-run and single-writer scheduler semantics.
+14. Search is published-article-only, noindex/follow, HTTP 200 for empty/no-result, and never includes ads or sitemap entries.
+15. `sitemap.xml` and `news-sitemap.xml` must use real article/category timestamps; never fabricate freshness with `new Date()` per URL.
+16. Keep source timestamp, Berita Auto publication timestamp, and update timestamp semantically distinct and visually separated.
+17. When a new problem appears, record/update it in the Admin Project Work Log instead of hiding it in the final response.
+18. Run real build/tests when the environment allows them. When blocked, cite the exact CI/Vercel evidence and do not claim success.
+19. Use atomic Git Data API trees/commits where practical and verify the resulting SHA and production deployment before declaring completion.
+20. Read `/SKILL.md` for the full architecture, persistence, scheduler, SEO, AI, Work Log, Admin Monitor, and deployment procedures.
