@@ -1,32 +1,8 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "git diff HEAD^ HEAD --quiet -- . ':!data/articles.json'",
-  "headers": [
-    {
-      "source": "/admin-berita",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-store, max-age=0"
-        },
-        {
-          "key": "X-Robots-Tag",
-          "value": "noindex, nofollow, noarchive"
-        }
-      ]
-    },
-    {
-      "source": "/admin-berita/:path*",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-store, max-age=0"
-        },
-        {
-          "key": "X-Robots-Tag",
-          "value": "noindex, nofollow, noarchive"
-        }
-      ]
-    }
+  "$schema":"https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand":"git diff HEAD^ HEAD --quiet -- . ':!data/articles.json' ':!data/pending-articles.json'",
+  "headers":[
+    {"source":"/admin-berita","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"X-Robots-Tag","value":"noindex, nofollow, noarchive"}]},
+    {"source":"/admin-berita/:path*","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"X-Robots-Tag","value":"noindex, nofollow, noarchive"}]}
   ]
 }
