@@ -2,6 +2,9 @@ name: Feature News Scheduler
 
 # Production schedule lives on default branch and executes the application branch.
 on:
+  push:
+    branches:
+      - main
   schedule:
     - cron: "2-59/5 * * * *"
   workflow_dispatch:
@@ -15,6 +18,7 @@ concurrency:
 
 jobs:
   generate:
+    if: ${{ github.event_name != 'push' || startsWith(github.event.head_commit.message, 'chore: bootstrap scheduler lock') }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -51,7 +55,7 @@ jobs:
         run: |
           git add package-lock.json data/articles.json data/pending-articles.json
           if ! git diff --cached --quiet; then
-            git commit -m "chore: update queued auto news"
+            git commit -m "chore: bootstrap scheduler lock and queued news"
           fi
 
       - name: Rebase on latest feature branch
