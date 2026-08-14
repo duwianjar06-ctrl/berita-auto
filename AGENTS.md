@@ -16,4 +16,7 @@
 14. Analytics code is optional and activates only when `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are configured.
 15. Admin source distribution must be derived from real published article `sourceName` data; never hardcode source counts or include pending candidates.
 16. Source distribution and Source Monitor have different semantics: distribution measures published article contribution, while Source Monitor measures feed/source health and fetching state.
-17. Read `/SKILL.md` for the exact Git Data API, scheduler, queue, analytics, deployment, maintenance, and admin distribution procedures.
+17. Gemini is the primary article-generation provider; OpenAI is optional secondary; AI failures must never stop the one-article publication run because factual non-AI fallback is the final path.
+18. Provider metadata must reflect the actual generation path; never fabricate AI success, model names, credentials, or pipeline status.
+19. Public advertising UI must never render the WhatsApp phone number as visible text; keep the existing number only inside the CTA href.
+20. Read `/SKILL.md` for the exact Git Data API, scheduler, queue, analytics, AI generation, deployment, maintenance, advertising, and admin distribution procedures.
