@@ -32,9 +32,9 @@ if(!chosen){
   const image=imageResult[0].status==='fulfilled'?imageResult[0].value:{imageUrl:chosen.imageUrl||null,source:chosen.imageUrl?'rss':'none'};
   const aiStart=Date.now();
   const ai=await generateArticle(chosen);
-  console.log(`[perf] article generation ${Date.now()-aiStart}ms`);
+  console.log(`[perf] article generation ${Date.now()-aiStart}ms provider=${ai.generationProvider}`);
   const sitePublishedAt=new Date().toISOString();
-  const article={id:chosen.fingerprint,fingerprint:chosen.fingerprint,slug:chosen.slug,title:ai.title,summary:chosen.summary||ai.excerpt||chosen.title,excerpt:ai.excerpt||chosen.summary||chosen.title,content:ai.content,url:chosen.url,sourceUrl:chosen.sourceUrl,sourceName:chosen.sourceName,category:chosen.category||'Nasional',imageUrl:image.imageUrl||chosen.imageUrl||null,imageSource:image.source||null,publishedAt:chosen.publishedAt||null,sourcePublishedAt:chosen.publishedAt||null,sitePublishedAt,createdAt:sitePublishedAt};
+  const article={id:chosen.fingerprint,fingerprint:chosen.fingerprint,slug:chosen.slug,title:ai.title,summary:chosen.summary||ai.excerpt||chosen.title,excerpt:ai.excerpt||chosen.summary||chosen.title,content:ai.content,url:chosen.url,sourceUrl:chosen.sourceUrl,sourceName:chosen.sourceName,category:chosen.category||'Nasional',imageUrl:image.imageUrl||chosen.imageUrl||null,imageSource:image.source||null,publishedAt:chosen.publishedAt||null,sourcePublishedAt:chosen.publishedAt||null,sitePublishedAt,createdAt:sitePublishedAt,generationProvider:ai.generationProvider||'fallback',generationModel:ai.generationModel||null,generationAt:ai.generationAt||sitePublishedAt};
   const remaining=combined.filter(item=>item.fingerprint!==chosen.fingerprint);
   const next=[article,...published].filter((item,index,array)=>index===array.findIndex(x=>x.fingerprint===item.fingerprint)).slice(0,500);
   await writeArticles(next);
@@ -43,6 +43,7 @@ if(!chosen){
   console.log(`[publish] source: ${article.sourceName}`);
   console.log(`[publish] category: ${article.category}`);
   console.log(`[publish] sitePublishedAt: ${article.sitePublishedAt}`);
+  console.log(`[publish] generationProvider: ${article.generationProvider}`);
   console.log(`[queue] after-publish=${remaining.length}`);
   console.log('[worker] complete publications=1');
 }
