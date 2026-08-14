@@ -13,7 +13,7 @@ Production branch: `feature/auto-news-mvp`; never change it to `main`.
 Never force-push or force-update refs.
 
 ## Core Architecture
-Official RSS -> normalize/dedupe/classify -> pending queue -> deterministic source-rotation selection -> source material -> provider registry (Gemini -> optional OpenAI) -> factual fallback -> image enrichment -> persistent publication storage.
+Official RSS -> normalize/dedupe/classify -> pending queue -> deterministic source-rotation selection -> source material -> provider registry (Gemini -> optional OpenAI) -> factual fallback -> image validation -> persistent publication storage.
 
 When Upstash Redis is configured, it is the live source of truth for published articles and the pending queue. GitHub JSON files are migration/backup snapshots, not the live production datastore.
 
@@ -57,25 +57,26 @@ Feed/category hints are used first when they map to an existing category; otherw
 `worker/strategy.js` applies deterministic source diversity scoring. It considers freshness, breaking-news relevance, category diversity, source weight, recent publisher use, consecutive-publisher use, and recent publisher share.
 
 Rules:
-- normal cadence remains one publication per run;
+- scheduled publication target is 2 articles per normal cycle;
 - no more than two consecutive publications from the same publisher when alternatives are available;
 - the recent ten-publication window penalizes publishers at or above a 35% share;
 - recently unused publishers receive a deterministic diversity bonus;
 - freshness/quality wins when alternatives are unavailable;
-- catch-up can publish 2/3/5 articles according to the existing adaptive outage policy, and the history is updated after each publication so the same source is not repeatedly selected inside one catch-up run.
+- publication history is updated after each article so the same source is not repeatedly selected inside one cycle.
 
 Telemetry logs publisher distribution for the recent publication window. Admin source distribution continues to use real persisted article state.
 
 ## Queue and Publication
-`worker/strategy.js` keeps the existing queue bounds and adaptive policy:
+`worker/strategy.js` keeps the existing queue bounds:
 - low watermark 30
 - target 60
 - maximum 120
 - freshness cutoff 12 hours
-- normal/delayed/stale/long-outage publication maxima: 1/2/3/5
-- hard maximum 5
+- scheduled publication target: 2
 
 Pending candidates are never public. `sitePublishedAt` is the actual Berita Auto publication time; never synthesize cadence timestamps.
+
+A candidate without a valid HTTP(S) image URL is skipped before AI processing and is never published.
 
 ## Persistence
 Persistence adapter: `lib/persistence.js` using the existing Upstash Redis REST configuration.
@@ -95,22 +96,30 @@ The publication lock is Redis `SET ... NX EX` and is shared by QStash, GitHub fa
 `sitePublishedAt` = Berita Auto publication timestamp.
 `updatedAt` = actual content update timestamp when available.
 
-Published records also retain `publisher`, `sourceName`, `sourceId`, `sourceUrl`, canonical article URL, fingerprint, and title fingerprint. `publishedAt` remains source-time-compatible for existing records.
+Published records also retain `publisher`, `sourceName`, `sourceId`, `sourceUrl`, canonical article URL, fingerprint, title fingerprint, language, and image metadata. `publishedAt` remains source-time-compatible for existing records.
 
 ## AI Provider Architecture
-`lib/ai-providers.js` uses Gemini primary, optional OpenAI secondary, and factual non-AI fallback. AI is never a hard dependency for publication. Provider metadata must reflect the real generation path.
+`lib/ai-providers.js` uses Gemini primary, optional OpenAI secondary, and factual non-AI fallback. Gemini model defaults to stable `gemini-2.5-flash-lite`, which supports structured JSON output and is intended for low-latency/high-volume workloads. The model can be overridden with `GEMINI_MODEL` without changing the credential variable.
 
-Never log or commit provider credentials or raw credential-bearing responses.
+AI is lazy: RSS candidates are fetched, filtered, deduplicated, image-validated, ranked, and only the final publication candidates are sent to an AI provider. Never call Gemini for the whole RSS candidate set.
+
+Gemini output is requested as structured JSON and validated before publication. The prompt requires factual transformation only, Indonesian output, no invented facts or quotes, no invented URLs, and no claim of external verification. International-language source material must become natural Bahasa Indonesia without changing names, dates, numbers, locations, organizations, quotes, or material facts.
+
+Gemini calls have an 18-second timeout and at most one bounded retry for transient 429/5xx/timeout failures. Authentication failures are not retried indefinitely. If Gemini fails, the optional OpenAI provider is tried, then deterministic factual fallback remains available.
+
+AI telemetry may log provider, model, status, duration and article fingerprint only. Never log prompts, full source material, raw provider responses, authorization headers, or credentials.
+
+Environment variable: `GEMINI_API_KEY`. `.env.example` may contain only the empty variable name. The production credential must live only in Vercel Environment Variables and must never be committed.
 
 ## Scheduler
 **Primary scheduler: QStash.** It targets `GET https://berita-auto.vercel.app/api/cron/news-publish` with `Authorization: Bearer <CRON_SECRET>` forwarded securely. Target cadence: `*/5 * * * *`.
 
-**Fallback/watchdog: GitHub Actions on `main`.** `.github/workflows/feature-branch-scheduler.yml` calls the same secured production endpoint and contains no duplicate publication business logic. It must remain lower-frequency than QStash (target approximately `7,22,37,52 * * * *` once QStash stability is proven). `.github/workflows/auto-news.yml` is legacy and is not the production scheduler.
+**Fallback/watchdog: GitHub Actions on `main`.** `.github/workflows/feature-branch-scheduler.yml` calls the same secured production endpoint and contains no duplicate publication business logic. It remains a lower-priority fallback/watchdog. `.github/workflows/auto-news.yml` is legacy and is not the production scheduler.
 
 All triggers call the same `runPublicationCycle`. Do not create a second worker path.
 
 ## Admin / Pipeline
-Admin source distribution is calculated from persisted published articles. It must show real publisher counts and percentages, not synthetic values. The Automation / News Pipeline tab must expose actual worker state, provider metadata, publication result, and timing.
+Admin source distribution is calculated from persisted published articles. It must show real publisher counts and percentages, not synthetic values. The Automation / News Pipeline tab must expose actual worker state, provider metadata, publication result, AI timing, and source telemetry.
 
 Admin APIs require server-side authentication and authorization with the existing Google OAuth and `ADMIN_EMAILS` rules.
 
@@ -137,6 +146,7 @@ When the environment permits, run:
 - `npm run build`
 - `node --check worker/run.js`
 - `node worker/source-verification.js`
+- `node worker/ai-verification.js`
 - existing tests/lint only if present in `package.json`
 - production route checks
 - real scheduler/publication verification
@@ -144,13 +154,13 @@ When the environment permits, run:
 Do not claim a check passed without evidence.
 
 ## Source Research Record
-The initial source research found official/known publisher feed endpoints for the active registry. Web validation showed ANTARA and Liputan6 endpoints returning XML to the fetch layer, while CNN Indonesia and CNBC Indonesia currently return HTTP 403 to the web fetcher. Historical Tempo RSS endpoints also return HTTP 403, so Tempo was not added to the active registry. Third-party feed directories were used only to discover candidate URLs, not as runtime ingestion sources.
+The active registry contains verified official publisher RSS/Atom endpoints. Publishers without a reliable or clearly usable official feed are skipped rather than replaced with third-party proxy feeds. International publishers may be added only after official feed/API and usage terms are verified.
 
 ## Security
-Never print or commit `CRON_SECRET`, Upstash tokens, QStash tokens, OAuth secrets, Gemini/OpenAI keys, or `.env` files. If a secret is found in repository history, treat it as a security issue without repeating its value.
+Never print or commit `CRON_SECRET`, Upstash tokens, QStash tokens, OAuth secrets, Gemini/OpenAI keys, or `.env` files. If a secret is found in repository history, treat it as a security issue without repeating its value. Any credential previously exposed in conversation must be rotated and must not be reused.
 
 ## Definition of Done
-Multi-source ingestion, source isolation, cross-source dedupe, deterministic rotation, metadata separation, Redis persistence, build/tests, atomic commit, READY production deployment, runtime publication, multi-publisher production evidence, Admin Pipeline, scheduler evidence, and required documentation must all be verified before declaring completion.
+Multi-source ingestion, source isolation, cross-source dedupe, deterministic rotation, metadata separation, Redis persistence, build/tests, atomic commit, READY production deployment, runtime publication, multi-publisher production evidence, Admin Pipeline, scheduler evidence, Gemini primary success evidence, lazy AI generation, fallback availability, image validation, and required documentation must all be verified before declaring completion.
 
 ## Source of Truth
 Current source code and verified production behavior win over historical conversation or stale documentation. Update this guide when architecture changes.
