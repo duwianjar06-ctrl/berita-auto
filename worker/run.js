@@ -1,19 +1,32 @@
+import {fileURLToPath} from 'node:url';
 import {fetchNews} from '../lib/rss.js';
 import {generateArticle} from '../lib/ai.js';
 import {readArticles,writeArticles,readPending,writePending} from '../lib/storage.js';
+import {persistenceConfigured,acquireLock,releaseLock} from '../lib/persistence.js';
 import {articleFingerprint} from './normalize.js';
 import {selectIngestionCandidates,selectPublication,publicationPlan,queueConfig} from './strategy.js';
 import {enrichArticle} from './image-enrichment.js';
 import {classifyCategory} from './category.js';
 import {startPipelineRun,setPipelineStage,finishPipelineStage,completePipelineRun,getPipelineSnapshot} from '../lib/pipeline.js';
 
-async function main(){
+const LOCK_KEY='ba:news:publication-lock';
+const LOCK_TTL_SECONDS=120;
+
+export async function runPublicationCycle({trigger='manual',now=Date.now()}={}){
+  if(trigger==='vercel-cron'&&!persistenceConfigured())throw new Error('persistent_database_not_configured');
   const started=Date.now();
-  const now=Date.now();
-  const run=await startPipelineRun({scheduledAt:process.env.GITHUB_RUN_STARTED_AT||new Date().toISOString(),triggerMode:process.env.NEWS_TRIGGER_MODE||'unknown'});
-  const runId=run?.id;
-  console.log('[worker] scheduled run');
+  const cycleNow=Number.isFinite(now)?now:Date.now();
+  const lockToken=`${trigger}:${process.pid}:${Date.now()}`;
+  const locked=persistenceConfigured()?await acquireLock(LOCK_KEY,lockToken,LOCK_TTL_SECONDS):false;
+  if(persistenceConfigured()&&!locked){
+    console.log('[worker] skipped: publication lock already held');
+    return {status:'skipped',reason:'worker_active',published:0};
+  }
+  let runId=null;
   try{
+    const run=await startPipelineRun({scheduledAt:process.env.GITHUB_RUN_STARTED_AT||new Date(cycleNow).toISOString(),triggerMode:trigger});
+    runId=run?.id;
+    console.log(`[worker] scheduled run trigger=${trigger}`);
     let t=Date.now();
     await setPipelineStage(runId,'READING_STATE',t);
     const published=await readArticles();
@@ -36,12 +49,12 @@ async function main(){
 
     t=Date.now();
     await setPipelineStage(runId,'QUEUING',t);
-    const pendingFresh=pending.filter(item=>{const stamp=Date.parse(item.publishedAt||'');return !Number.isFinite(stamp)||now-stamp<=queueConfig.MAX_AGE_MS});
-    const refill=selectIngestionCandidates(normalized,seen,pendingFresh,published,now);
+    const pendingFresh=pending.filter(item=>{const stamp=Date.parse(item.publishedAt||'');return !Number.isFinite(stamp)||cycleNow-stamp<=queueConfig.MAX_AGE_MS});
+    const refill=selectIngestionCandidates(normalized,seen,pendingFresh,published,cycleNow);
     let remaining=[...pendingFresh,...refill.items];
-    const plan=publicationPlan(published,remaining,now);
+    const plan=publicationPlan(published,remaining,cycleNow);
     console.log(`[queue] before=${pending.length} expired=${pending.length-pendingFresh.length} added=${refill.items.length} after-ingest=${remaining.length}`);
-    console.log(`[queue] mode=${plan.mode} trigger=${process.env.NEWS_TRIGGER_MODE||'unknown'} publications-max=${plan.maxPublish} gap-minutes=${Number.isFinite(plan.gapMinutes)?plan.gapMinutes.toFixed(2):'n/a'} recent-rate-per-hour=${plan.recentRatePerHour.toFixed(2)} consecutive-failures=${consecutiveFailures}`);
+    console.log(`[queue] mode=${plan.mode} trigger=${trigger} publications-max=${plan.maxPublish} gap-minutes=${Number.isFinite(plan.gapMinutes)?plan.gapMinutes.toFixed(2):'n/a'} recent-rate-per-hour=${plan.recentRatePerHour.toFixed(2)} consecutive-failures=${consecutiveFailures}`);
     await finishPipelineStage(runId,'QUEUING',t);
 
     let publishedNow=[...published];
@@ -103,13 +116,18 @@ async function main(){
     await completePipelineRun(runId,{status:'COMPLETED',stage:publicationCount?'COMPLETED':'IDLE',published:publicationCount,summary});
     console.log(`[worker] complete publications=${publicationCount} mode=${plan.mode}`);
     if(lastError)console.error(`[worker] partial success; stopped after ${publicationCount} publication(s): ${String(lastError?.message||lastError).slice(0,240)}`);
+    return {status:'completed',published:publicationCount,queue:remaining.length,mode:plan.mode,workerDurationMs};
   }catch(error){
     const safe=String(error?.message||error).slice(0,240);
-    await completePipelineRun(runId,{status:'FAILED',stage:'FAILED',published:0,error:safe,summary:{workerDurationMs:Date.now()-started,triggerMode:process.env.NEWS_TRIGGER_MODE||'unknown'}}).catch(()=>{});
+    if(runId)await completePipelineRun(runId,{status:'FAILED',stage:'FAILED',published:0,error:safe,summary:{workerDurationMs:Date.now()-started,triggerMode:trigger}}).catch(()=>{});
     console.error(`[worker] failed ${safe}`);
     throw error;
+  }finally{
+    if(locked)await releaseLock(LOCK_KEY,lockToken).catch(()=>{});
+    console.log(`[perf] total ${Date.now()-started}ms`);
   }
-  console.log(`[perf] total ${Date.now()-started}ms`);
 }
 
-main().catch(error=>{console.error(`[worker] fatal ${String(error?.message||error).slice(0,240)}`);process.exitCode=1});
+if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
+  runPublicationCycle({trigger:process.env.NEWS_TRIGGER_MODE||'cli',now:Date.now()}).catch(error=>{console.error(`[worker] fatal ${String(error?.message||error).slice(0,240)}`);process.exitCode=1});
+}
