@@ -5,12 +5,12 @@ import {articleFingerprint} from './normalize.js';
 import {selectIngestionCandidates,selectPublication,publicationPlan,queueConfig} from './strategy.js';
 import {enrichArticle} from './image-enrichment.js';
 import {classifyCategory} from './category.js';
-import {startPipelineRun,setPipelineStage,finishPipelineStage,completePipelineRun} from '../lib/pipeline.js';
+import {startPipelineRun,setPipelineStage,finishPipelineStage,completePipelineRun,getPipelineSnapshot} from '../lib/pipeline.js';
 
 async function main(){
   const started=Date.now();
   const now=Date.now();
-  const run=await startPipelineRun({scheduledAt:process.env.GITHUB_RUN_STARTED_AT||new Date().toISOString()});
+  const run=await startPipelineRun({scheduledAt:process.env.GITHUB_RUN_STARTED_AT||new Date().toISOString(),triggerMode:process.env.NEWS_TRIGGER_MODE||'unknown'});
   const runId=run?.id;
   console.log('[worker] scheduled run');
   try{
@@ -18,6 +18,8 @@ async function main(){
     await setPipelineStage(runId,'READING_STATE',t);
     const published=await readArticles();
     const pending=await readPending();
+    const snapshot=await getPipelineSnapshot();
+    const consecutiveFailures=(snapshot.runs||[]).slice(0,20).reduce((count,row)=>count>0&&row?.status==='FAILED'?count+1:(row?.status==='FAILED'?1:count),0);
     await finishPipelineStage(runId,'READING_STATE',t);
 
     const seen=new Set(published.map(a=>a.fingerprint).filter(Boolean));
@@ -39,7 +41,7 @@ async function main(){
     let remaining=[...pendingFresh,...refill.items];
     const plan=publicationPlan(published,remaining,now);
     console.log(`[queue] before=${pending.length} expired=${pending.length-pendingFresh.length} added=${refill.items.length} after-ingest=${remaining.length}`);
-    console.log(`[queue] mode=${plan.mode} publications-max=${plan.maxPublish} gap-minutes=${Number.isFinite(plan.gapMinutes)?plan.gapMinutes.toFixed(2):'n/a'} recent-rate-per-hour=${plan.recentRatePerHour.toFixed(2)}`);
+    console.log(`[queue] mode=${plan.mode} trigger=${process.env.NEWS_TRIGGER_MODE||'unknown'} publications-max=${plan.maxPublish} gap-minutes=${Number.isFinite(plan.gapMinutes)?plan.gapMinutes.toFixed(2):'n/a'} recent-rate-per-hour=${plan.recentRatePerHour.toFixed(2)} consecutive-failures=${consecutiveFailures}`);
     await finishPipelineStage(runId,'QUEUING',t);
 
     let publishedNow=[...published];
@@ -96,14 +98,14 @@ async function main(){
     }
 
     const workerDurationMs=Date.now()-started;
-    const summary={provider:publishedNow[0]?.generationProvider||null,model:publishedNow[0]?.generationModel||null,workerDurationMs,publishDurationMs:Date.now()-publicationStart,pendingCount:remaining.length,candidatesFound:pendingFresh.length+refill.items.length,accepted:publicationCount,rejected:Math.max(0,pendingFresh.length+refill.items.length-publicationCount),mode:plan.mode,maxPublications:plan.maxPublish,gapMinutes:Number.isFinite(plan.gapMinutes)?plan.gapMinutes:null,recentRatePerHour:plan.recentRatePerHour};
+    const summary={provider:publishedNow[0]?.generationProvider||null,model:publishedNow[0]?.generationModel||null,workerDurationMs,publishDurationMs:Date.now()-publicationStart,pendingCount:remaining.length,candidatesFound:pendingFresh.length+refill.items.length,accepted:publicationCount,rejected:Math.max(0,pendingFresh.length+refill.items.length-publicationCount),mode:plan.mode,maxPublications:plan.maxPublish,gapMinutes:Number.isFinite(plan.gapMinutes)?plan.gapMinutes:null,recentRatePerHour:plan.recentRatePerHour,lastSchedulerEventAt:run?.scheduledAt||null,lastWorkerStartedAt:run?.startedAt||new Date(started).toISOString(),lastWorkerSuccessAt:publicationCount?new Date().toISOString():null,lastPublishedAt:publishedNow[0]?.sitePublishedAt||null,consecutiveFailures:publicationCount?0:consecutiveFailures};
     if(!publicationCount&&lastError)throw lastError;
     await completePipelineRun(runId,{status:'COMPLETED',stage:publicationCount?'COMPLETED':'IDLE',published:publicationCount,summary});
     console.log(`[worker] complete publications=${publicationCount} mode=${plan.mode}`);
     if(lastError)console.error(`[worker] partial success; stopped after ${publicationCount} publication(s): ${String(lastError?.message||lastError).slice(0,240)}`);
   }catch(error){
     const safe=String(error?.message||error).slice(0,240);
-    await completePipelineRun(runId,{status:'FAILED',stage:'FAILED',published:0,error:safe,summary:{workerDurationMs:Date.now()-started}}).catch(()=>{});
+    await completePipelineRun(runId,{status:'FAILED',stage:'FAILED',published:0,error:safe,summary:{workerDurationMs:Date.now()-started,triggerMode:process.env.NEWS_TRIGGER_MODE||'unknown'}}).catch(()=>{});
     console.error(`[worker] failed ${safe}`);
     throw error;
   }
