@@ -4,6 +4,7 @@ name: Feature News Scheduler
 on:
   schedule:
     - cron: "2-59/5 * * * *"
+    - cron: "4-59/10 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -30,9 +31,52 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Generate and publish one article
+      - name: Decide scheduler role
+        id: gate
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            role="manual"
+            should_run="true"
+          elif [[ "$EVENT_SCHEDULE" == "2-59/5 * * * *" ]]; then
+            role="primary"
+            should_run="true"
+          else
+            role="watchdog"
+            should_run="false"
+            node <<'NODE'
+            const fs=require('node:fs');
+            const path=require('node:path');
+            const read=(name, fallback)=>{
+              try{return JSON.parse(fs.readFileSync(path.join(process.cwd(),name),'utf8'));}
+              catch{return fallback;}
+            };
+            const articles=read('data/articles.json',[]);
+            const pending=read('data/pending-articles.json',[]);
+            const last=articles[0];
+            const stamp=Date.parse(last?.sitePublishedAt||last?.createdAt||'');
+            const gapMinutes=Number.isFinite(stamp)?Math.max(0,(Date.now()-stamp)/60000):Infinity;
+            const recover=pending.length>0&&gapMinutes>10;
+            console.log(`[watchdog] latest=${last?.title||'none'}`);
+            console.log(`[watchdog] pending=${pending.length} gap-minutes=${Number.isFinite(gapMinutes)?gapMinutes.toFixed(2):'n/a'} recovery=${recover}`);
+            fs.writeFileSync(process.env.GITHUB_OUTPUT||'/tmp/no-output',`should_run=${recover}\nrole=watchdog\n`);
+            NODE
+          fi
+          if [[ "$role" != "watchdog" ]]; then
+            echo "role=$role" >> "$GITHUB_OUTPUT"
+            echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
+          fi
+          echo "[scheduler] role=$role should_run=$should_run"
+
+      - name: Generate and publish controlled articles
+        if: steps.gate.outputs.should_run == 'true'
         run: npm run news:run
         env:
+          NEWS_TRIGGER_MODE: ${{ steps.gate.outputs.role }}
+          GITHUB_RUN_STARTED_AT: ${{ github.run_started_at }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -41,11 +85,13 @@ jobs:
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Configure git
+        if: steps.gate.outputs.should_run == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Commit queue and published data
+        if: steps.gate.outputs.should_run == 'true'
         run: |
           git add data/articles.json data/pending-articles.json
           if ! git diff --cached --quiet; then
@@ -53,9 +99,11 @@ jobs:
           fi
 
       - name: Rebase on latest feature branch
+        if: steps.gate.outputs.should_run == 'true'
         run: |
           git fetch origin feature/auto-news-mvp
           git rebase origin/feature/auto-news-mvp
 
       - name: Push application data
+        if: steps.gate.outputs.should_run == 'true'
         run: git push origin HEAD:feature/auto-news-mvp
