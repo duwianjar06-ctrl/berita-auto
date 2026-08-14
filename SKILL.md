@@ -29,6 +29,10 @@ Active publisher groups:
 - CNBC Indonesia
 - Media Indonesia
 - Tribunnews
+- Deutsche Welle
+- NASA
+- NASA JPL
+- NOAA NHC
 
 Current official feed endpoints are maintained in `lib/sources.js`. Feed discovery uses RSS/Atom only; no HTML scraping is part of the ingestion path. Feed failures are isolated per source and logged without failing the complete cycle.
 
@@ -114,7 +118,7 @@ Environment variable: `GEMINI_API_KEY`. `.env.example` may contain only the empt
 ## Scheduler
 **Primary scheduler: QStash.** It targets `GET https://berita-auto.vercel.app/api/cron/news-publish` with `Authorization: Bearer <CRON_SECRET>` forwarded securely. Target cadence: `*/5 * * * *`.
 
-**Fallback/watchdog: GitHub Actions on `main`.** `.github/workflows/feature-branch-scheduler.yml` calls the same secured production endpoint and contains no duplicate publication business logic. It remains a lower-priority fallback/watchdog. `.github/workflows/auto-news.yml` is legacy and is not the production scheduler.
+**Fallback/watchdog: GitHub Actions on `main`.** `.github/workflows/feature-branch-scheduler.yml` calls the same secured production endpoint and contains no duplicate publication business logic. It runs at `7,22,37,52 * * * *` as a lower-priority 15-minute fallback/watchdog. `.github/workflows/auto-news.yml` is legacy and is not the production scheduler.
 
 All triggers call the same `runPublicationCycle`. Do not create a second worker path.
 
@@ -154,7 +158,7 @@ When the environment permits, run:
 Do not claim a check passed without evidence.
 
 ## Source Research Record
-The active registry contains verified official publisher RSS/Atom endpoints. Publishers without a reliable or clearly usable official feed are skipped rather than replaced with third-party proxy feeds. International publishers may be added only after official feed/API and usage terms are verified.
+The active registry includes verified official feeds from Indonesian publishers plus international/government publishers with public RSS/Atom distribution: Deutsche Welle, NASA, NASA JPL/CNEOS, and NOAA/National Hurricane Center. The Guardian, VOA, and other publishers were evaluated but not enabled where terms or third-party rights did not clearly support the intended transformation/redistribution model. Publishers without a reliable or clearly usable official feed are skipped rather than replaced with third-party proxy feeds.
 
 ## Security
 Never print or commit `CRON_SECRET`, Upstash tokens, QStash tokens, OAuth secrets, Gemini/OpenAI keys, or `.env` files. If a secret is found in repository history, treat it as a security issue without repeating its value. Any credential previously exposed in conversation must be rotated and must not be reused. Production Gemini verification requires the newly rotated credential to be installed privately in Vercel and a fresh production deployment to consume it.
