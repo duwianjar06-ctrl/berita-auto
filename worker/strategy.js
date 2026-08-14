@@ -6,6 +6,9 @@ const LOW_WATERMARK=30;
 const QUEUE_TARGET=60;
 const QUEUE_MAX=120;
 const MAX_AGE_MS=12*60*60*1000;
+const MAX_PUBLICATIONS_NORMAL=1;
+const MAX_PUBLICATIONS_CATCHUP=3;
+const CATCHUP_AFTER_MINUTES=15;
 
 function ageMs(value,now){const t=Date.parse(value||'');return Number.isFinite(t)?Math.max(0,now-t):Infinity;}
 function freshness(value,now){const age=ageMs(value,now);if(age<=2*60*60*1000)return 100;if(age<=6*60*60*1000)return 70;if(age<=12*60*60*1000)return 35;return 0;}
@@ -33,11 +36,7 @@ export function selectIngestionCandidates(items,seen,pending=[],existing=[],now=
   const target=Math.min(max,Math.max(0,QUEUE_MAX-pending.length));
   const buckets=new Map();
   for(const item of candidates){if(!buckets.has(item.category))buckets.set(item.category,[]);buckets.get(item.category).push(item);}
-  const categories=[...buckets.keys()].sort((a,b)=>{
-    const pa=Math.max(...buckets.get(a).map(x=>x.priority));
-    const pb=Math.max(...buckets.get(b).map(x=>x.priority));
-    return pb-pa;
-  });
+  const categories=[...buckets.keys()].sort((a,b)=>{const pa=Math.max(...buckets.get(a).map(x=>x.priority));const pb=Math.max(...buckets.get(b).map(x=>x.priority));return pb-pa;});
   const selected=[];let round=0;
   while(selected.length<target){let progressed=false;for(const category of categories){const bucket=buckets.get(category);if(round<bucket.length&&selected.length<target){selected.push(bucket[round]);progressed=true;}}if(!progressed)break;round++;}
   return {items:selected,catchUp,max,queueTarget:QUEUE_TARGET,queueMax:QUEUE_MAX};
@@ -57,4 +56,4 @@ export function selectPublication(pending,history=[],now=Date.now()){
   const chosen={...scored[0]};delete chosen._score;return chosen;
 }
 
-export const queueConfig={NORMAL_MAX,CATCHUP_MAX,LOW_WATERMARK,QUEUE_TARGET,QUEUE_MAX,MAX_AGE_MS};
+export const queueConfig={NORMAL_MAX,CATCHUP_MAX,LOW_WATERMARK,QUEUE_TARGET,QUEUE_MAX,MAX_AGE_MS,MAX_PUBLICATIONS_NORMAL,MAX_PUBLICATIONS_CATCHUP,CATCHUP_AFTER_MINUTES};
