@@ -1,4 +1,5 @@
 import './globals.css';
+import './article-hero.css';
 import '../components/ads.css';
 import './timestamp.css';
 import '../components/admin/workspace.css';
