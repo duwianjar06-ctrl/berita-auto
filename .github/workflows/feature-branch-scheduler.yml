@@ -27,10 +27,29 @@ jobs:
             exit 1
           fi
 
-          response=$(curl --fail-with-body --silent --show-error \
+          set +e
+          body_file=$(mktemp)
+          http_status=$(curl --silent --show-error \
             --max-time 90 \
+            -o "$body_file" \
+            -w "%{http_code}" \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Accept: application/json" \
             "$PUBLICATION_URL")
+          curl_exit=$?
+          set -e
 
+          response=$(cat "$body_file")
+          rm -f "$body_file"
+
+          echo "HTTP_STATUS=${http_status}"
           echo "$response"
+
+          if [[ "$curl_exit" -ne 0 ]]; then
+            echo "curl_exit=${curl_exit}"
+            exit "$curl_exit"
+          fi
+
+          if [[ "$http_status" -lt 200 || "$http_status" -ge 300 ]]; then
+            exit 1
+          fi
