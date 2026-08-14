@@ -14,4 +14,6 @@
 12. Ingestion is separate from publication. A worker run publishes at most one article.
 13. Never fabricate reader views, geo data, quotations, reporters, interviews, facts, or credentials.
 14. Analytics code is optional and activates only when `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are configured.
-15. Read `/SKILL.md` for the exact Git Data API, scheduler, queue, analytics, deployment, and maintenance procedures.
+15. Admin source distribution must be derived from real published article `sourceName` data; never hardcode source counts or include pending candidates.
+16. Source distribution and Source Monitor have different semantics: distribution measures published article contribution, while Source Monitor measures feed/source health and fetching state.
+17. Read `/SKILL.md` for the exact Git Data API, scheduler, queue, analytics, deployment, maintenance, and admin distribution procedures.
