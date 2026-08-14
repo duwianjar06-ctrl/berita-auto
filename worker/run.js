@@ -8,7 +8,7 @@ import {classifyCategory} from './category.js';
 
 const start=Date.now();
 const loaded=await readArticles();
-const old=loaded.map(article=>article.sourceName==='ANTARA Terkini'&&article.category==='Nasional'?{...article,category:classifyCategory(article)}:article);
+const old=loaded.map(article=>({...article,category:classifyCategory(article)}));
 const seen=new Set(old.map(a=>a.fingerprint));
 console.log('[worker] scheduled run');
 const rssStart=Date.now();
