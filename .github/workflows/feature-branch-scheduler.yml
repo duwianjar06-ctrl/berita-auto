@@ -30,6 +30,9 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Reconcile npm lockfile when needed
+        run: npm install --package-lock-only --ignore-scripts --no-audit
+
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit
 
@@ -44,9 +47,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Commit queue and published data
+      - name: Commit queue, published data, and lock reconciliation
         run: |
-          git add data/articles.json data/pending-articles.json
+          git add package-lock.json data/articles.json data/pending-articles.json
           if ! git diff --cached --quiet; then
             git commit -m "chore: update queued auto news"
           fi
