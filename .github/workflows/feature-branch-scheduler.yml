@@ -1,111 +1,36 @@
 name: Feature News Scheduler
 
-# Production schedule lives on default branch and executes the application branch.
+# GitHub remains a fallback/watchdog trigger. Publication is executed by the shared API cycle.
 on:
   schedule:
-    - cron: "2-59/5 * * * *"
-    - cron: "4-59/10 * * * *"
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
 
-permissions:
-  contents: write
+permissions: {}
 
 concurrency:
   group: auto-news
   cancel-in-progress: false
 
 jobs:
-  generate:
+  fallback:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 3
     steps:
-      - name: Checkout application branch
-        uses: actions/checkout@v4
-        with:
-          ref: feature/auto-news-mvp
-          fetch-depth: 0
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Validate worker syntax
-        run: node --check worker/run.js
-
-      - name: Decide scheduler role
-        id: gate
-        shell: bash
+      - name: Trigger publication endpoint
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          EVENT_SCHEDULE: ${{ github.event.schedule }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          PUBLICATION_URL: https://berita-auto.vercel.app/api/cron/news-publish
         run: |
-          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            role="manual"
-            should_run="true"
-          elif [[ "$EVENT_SCHEDULE" == "2-59/5 * * * *" ]]; then
-            role="primary"
-            should_run="true"
-            echo "role=$role" >> "$GITHUB_OUTPUT"
-            echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
-          else
-            role="watchdog"
-            should_run="false"
-            node <<'NODE'
-            const fs=require('node:fs');
-            const path=require('node:path');
-            const read=(name,fallback)=>{try{return JSON.parse(fs.readFileSync(path.join(process.cwd(),name),'utf8'));}catch{return fallback;}};
-            const articles=read('data/articles.json',[]);
-            const pending=read('data/pending-articles.json',[]);
-            const last=articles[0];
-            const stamp=Date.parse(last?.sitePublishedAt||last?.createdAt||'');
-            const gapMinutes=Number.isFinite(stamp)?Math.max(0,(Date.now()-stamp)/60000):Infinity;
-            const recover=pending.length>0&&gapMinutes>10;
-            console.log(`[watchdog] latest=${last?.title||'none'}`);
-            console.log(`[watchdog] pending=${pending.length} gap-minutes=${Number.isFinite(gapMinutes)?gapMinutes.toFixed(2):'n/a'} recovery=${recover}`);
-            fs.writeFileSync(process.env.GITHUB_OUTPUT,`role=watchdog\nshould_run=${recover}\n`,{encoding:'utf8'});
-            NODE
-          fi
-          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            echo "role=$role" >> "$GITHUB_OUTPUT"
-            echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
-          fi
-          echo "[scheduler] role=$role should_run=$should_run"
-
-      - name: Generate and publish controlled articles
-        if: steps.gate.outputs.should_run == 'true'
-        run: npm run news:run
-        env:
-          NEWS_TRIGGER_MODE: ${{ steps.gate.outputs.role }}
-          GITHUB_RUN_STARTED_AT: ${{ github.run_started_at }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
-
-      - name: Configure git
-        if: steps.gate.outputs.should_run == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Commit queue and published data
-        if: steps.gate.outputs.should_run == 'true'
-        run: |
-          git add data/articles.json data/pending-articles.json
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: update queued auto news"
+          if [[ -z "$CRON_SECRET" ]]; then
+            echo "CRON_SECRET is not configured; fallback cannot trigger publication."
+            exit 1
           fi
 
-      - name: Rebase on latest feature branch
-        if: steps.gate.outputs.should_run == 'true'
-        run: |
-          git fetch origin feature/auto-news-mvp
-          git rebase origin/feature/auto-news-mvp
+          response=$(curl --fail-with-body --silent --show-error \
+            --max-time 90 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Accept: application/json" \
+            "$PUBLICATION_URL")
 
-      - name: Push application data
-        if: steps.gate.outputs.should_run == 'true'
-        run: git push origin HEAD:feature/auto-news-mvp
+          echo "$response"
