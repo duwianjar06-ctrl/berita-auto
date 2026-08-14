@@ -55,13 +55,13 @@ export function selectIngestionCandidates(items,seen,pending=[],existing=[],now=
   const recentSources=[...new Set(existing.slice(0,6).map(x=>String(x.sourceName||'').trim()).filter(Boolean))];
   for(const item of candidates)item.priority=priority(item,now,recentSources)+categoryWeight(item.category,counts);
   candidates.sort((a,b)=>b.priority-a.priority||Date.parse(b.publishedAt)-Date.parse(a.publishedAt));
-  const target=Math.min(HARD_MAX,Math.max(NORMAL_MAX,DELAYED_MAX),Math.max(0,QUEUE_MAX-pending.length));
+  const target=Math.min(Math.max(NORMAL_MAX,DELAYED_MAX),Math.max(0,QUEUE_TARGET-pending.length),Math.max(0,QUEUE_MAX-pending.length));
   const buckets=new Map();
   for(const item of candidates){if(!buckets.has(item.category))buckets.set(item.category,[]);buckets.get(item.category).push(item);}
   const categories=[...buckets.keys()].sort((a,b)=>Math.max(...buckets.get(b).map(x=>x.priority))-Math.max(...buckets.get(a).map(x=>x.priority)));
   const selected=[];let round=0;
   while(selected.length<target){let progressed=false;for(const category of categories){const bucket=buckets.get(category);if(round<bucket.length&&selected.length<target){selected.push(bucket[round]);progressed=true;}}if(!progressed)break;round++;}
-  return {items:selected,catchUp:selected.length>1,max:target,queueTarget:QUEUE_TARGET,queueMax:QUEUE_MAX};
+  return {items:selected,queueTarget:QUEUE_TARGET,queueMax:QUEUE_MAX};
 }
 
 export function selectPublication(pending,history=[],now=Date.now()){
