@@ -8,6 +8,7 @@ import {getPopularArticles,analyticsConfigured} from '../../lib/analytics.js';
 import {articlePath} from '../../lib/article-url.js';
 import {categories} from '../../lib/categories.js';
 import './editorial.css';
+import './intro.css';
 
 export const dynamic='force-dynamic';
 function byCategory(items,name){return items.filter(a=>(a.category||'').toLowerCase()===name.toLowerCase());}
