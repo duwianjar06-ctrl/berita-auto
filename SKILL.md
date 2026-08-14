@@ -53,7 +53,7 @@ Environment:
 - `GEMINI_API_KEY` — GitHub Actions secret only; never commit or log it.
 - `GEMINI_MODEL` — GitHub Actions repository variable; defaults to `gemini-2.5-flash-lite`.
 
-The default model is currently listed by Google as the stable `gemini-2.5-flash-lite` model with structured output support. Google currently lists a shutdown date of October 16, 2026 and recommends `gemini-3.1-flash-lite`, so `GEMINI_MODEL` must remain configurable and should be migrated before that date.
+The default model is currently valid and supports structured output. Google currently lists a shutdown date of October 16, 2026 and recommends `gemini-3.1-flash-lite`, so `GEMINI_MODEL` must remain configurable and should be migrated before that date.
 
 Gemini is called through the Google Generative Language API with `x-goog-api-key`. Structured JSON output requests `title`, `excerpt`, and `content`.
 
@@ -94,7 +94,7 @@ The homepage `BERITA HARI INI` section is an editorial introduction explaining t
 
 Current direction: explain that important news from various public sources is available in one place, reduce the need to open many publisher sites, and show compact supporting indicators.
 
-Dynamic source count is computed from current published article `sourceName` values. Category count uses the existing category architecture. No source count is hardcoded.
+Dynamic source count is computed from current published `sourceName` values. Category count uses the existing category architecture. No source count is hardcoded.
 
 The intro uses CSS/SVG-style geometry only, with subtle fade/stagger motion. It must respect `prefers-reduced-motion`, remain readable on mobile, and avoid fake `LIVE` indicators.
 
@@ -166,7 +166,7 @@ Required commands:
 - `npm run news:run`
 - `npm run news:repair`
 
-Controlled AI tests should cover Gemini success, missing key, 429, timeout, invalid response, 5xx, optional OpenAI failover, and factual fallback without consuming production quota.
+Controlled AI tests cover Gemini success, missing key, 429, timeout, invalid response, 5xx, optional OpenAI failover, and factual fallback without consuming production quota.
 
 ## DO NOT BREAK
 Google OAuth, `ADMIN_EMAILS`, Personal Notes, article IDs/fingerprints/slugs, canonical URLs, old redirects, RSS/pending dedupe, one-at-a-time publisher, sitemap, robots, Google verification, source distribution, source filtering, analytics, carousel, article full content, image behavior, production branch, and non-force Git history.
@@ -187,13 +187,15 @@ Current repository code wins over conversation history. Documentation must be up
 ✅ historical repair refuses fallback overwrite
 ✅ redesigned `BERITA HARI INI` homepage intro
 ✅ reusable responsive AdSlot redesign
-✅ public ad phone number removed from AdSlot markup
+✅ public ad phone number removed from AdSlot and Footer markup
 ✅ reduced-motion rules for new intro/ad styles
 ⚠️ live Gemini generation requires `GEMINI_API_KEY` to be configured in GitHub Actions; connector cannot prove secret existence
-⚠️ Gemini default model `gemini-2.5-flash-lite` is currently stable but Google lists shutdown on October 16, 2026; keep `GEMINI_MODEL` configurable and migrate before shutdown
+⚠️ `GEMINI_MODEL` repository-variable existence is not exposed by the available connector; code default is `gemini-2.5-flash-lite`
 ⚠️ no dedicated Admin News Pipeline component exists in the audited repository, so no mock provider panel was added
 
+## Verification Notes
+Latest production HTML was checked for the homepage. The new `BERITA HARI INI` intro and redesigned AdSlot markup were present, and the public phone number was removed from the footer before the final deployment.
+Production visual screenshot verification was not available because no browser/screenshot tool was exposed in this session; route/HTML verification and Vercel build verification were used instead.
+
 ## Last Verified
-Feature branch HEAD: update after final commit.
-Main branch: update after scheduler env commit if changed.
-Production deployment: update after final READY deployment.
+Verification is tied to the latest READY Production deployment and the current `feature/auto-news-mvp` branch HEAD. Re-fetch Git HEAD and Vercel deployment metadata before claiming a newer release.
