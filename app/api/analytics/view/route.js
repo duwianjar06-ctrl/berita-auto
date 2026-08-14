@@ -1,5 +1,5 @@
-import {readArticles} from '../../lib/storage.js';
-import {recordView} from '../../lib/analytics.js';
+import {readArticles} from '../../../../lib/storage.js';
+import {recordView} from '../../../../lib/analytics.js';
 
 export async function POST(request){
   try{

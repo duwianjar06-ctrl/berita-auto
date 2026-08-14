@@ -1,6 +1,6 @@
-import {auth} from '../../../auth.js';
-import {readArticles} from '../../../lib/storage.js';
-import {getAnalyticsSummary,queryAnalytics,analyticsConfigured} from '../../../lib/analytics.js';
+import {auth} from '../../../../../auth.js';
+import {readArticles} from '../../../../../lib/storage.js';
+import {getAnalyticsSummary,queryAnalytics,analyticsConfigured} from '../../../../../lib/analytics.js';
 
 export const dynamic='force-dynamic';
 export async function GET(request){const session=await auth();const allowed=(process.env.ADMIN_EMAILS||'').split(',').map(v=>v.trim().toLowerCase()).filter(Boolean);const email=session?.user?.email?.trim().toLowerCase();if(!email||!allowed.includes(email))return Response.json({error:'Unauthorized'},{status:401});if(!analyticsConfigured())return Response.json({configured:false,blocker:'UPSTASH_REDIS_REST_URL dan UPSTASH_REDIS_REST_TOKEN belum dikonfigurasi.'});const params=new URL(request.url).searchParams;const days=Math.min(30,Math.max(1,Number(params.get('days')||7)));const items=await readArticles();const summary=await getAnalyticsSummary(items,days);const filtered=await queryAnalytics(items,{days,category:params.get('category')||'',source:params.get('source')||'',country:params.get('country')||'',region:params.get('region')||'',city:params.get('city')||'',minViews:Number(params.get('minViews')||0),maxViews:params.has('maxViews')?Number(params.get('maxViews')):Infinity,sort:params.get('sort')||'views'});return Response.json({configured:true,summary,...filtered});}
