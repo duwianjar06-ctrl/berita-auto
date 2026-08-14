@@ -9,7 +9,7 @@ Stack: Next.js 15.5.7, React 19.1, NextAuth v5 beta, Node 22 in GitHub Actions.
 ## Branch Strategy
 Application: `feature/auto-news-mvp`
 Scheduler/default: `main`
-Production branch: `feature/auto-news-mvp`
+Production branch: `feature/auto-news-mvp` (verified current Vercel project configuration; do not change to `main`)
 Never force-push or force-update refs.
 
 ## Core Architecture
