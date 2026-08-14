@@ -16,221 +16,150 @@ Stack: Next.js 15.5.7, React 19.1, NextAuth v5 beta, Node.js 22 for worker Actio
 
 ## Architecture
 
-Official RSS sources -> normalize/dedupe/classify -> pending queue (`data/pending-articles.json`) -> choose one publication -> source material fetch -> AI paraphrase -> image enrichment -> published store (`data/articles.json`) -> Next.js/Vercel.
+Official RSS -> normalize/dedupe/classify -> pending queue (`data/pending-articles.json`) -> select one -> source material -> AI paraphrase when configured -> image enrichment -> published store (`data/articles.json`) -> Next.js/Vercel.
 
-Ingestion and publication are deliberately separate. Queue intake can add many candidates, but a worker run publishes at most one article.
+Ingestion and publication are separate. Intake may add 24 or 48 candidates, but a worker run publishes at most one article.
 
 ## Important Configuration
 
-Current worker constants live in `worker/strategy.js`:
+Worker constants are in `worker/strategy.js`:
 
 - normal ingestion max: 24
 - catch-up ingestion max: 48
 - queue target: 60
 - low watermark: 30
 - queue max: 120
-- max public publication per run: 1
-- freshness default: 12 hours
+- max publication per run: 1
+- freshness cutoff: 12 hours
 - RSS concurrency: 8
-- AI timeout: 18 seconds
-- source material timeout: 5 seconds
+- AI timeout: 18s
+- source material timeout: 5s
 
-The production scheduler targets approximately five minutes using `2-59/5 * * * *` on `main`.
+Production cron target on `main`: `2-59/5 * * * *`.
 
-## Publication Rules
+## Queue and Publication
 
-- Ingestion != publication.
-- Queue intake may add up to 24 candidates normally or 48 when the queue is below 30.
-- Only one pending candidate is promoted to published per worker run.
-- Freshness, category rotation, breaking priority, and international weighting affect publication order.
-- Pending articles are never exposed by public storage readers, sitemap, category pages, or article routes because only `data/articles.json` is public content storage.
-- Duplicate fingerprints are rejected across pending and published stores.
+`data/pending-articles.json` stores candidate metadata only. Pending is not part of public article reads, category pages, homepage, popular views, or sitemap.
 
-## Pending Queue
+When pending <30, intake targets 48 new candidates. When pending is 30-59, intake targets 24. When pending >=60, normal refill is skipped unless breaking/fresh logic is added safely. Queue never exceeds 120. Candidates older than 12h are normally expired.
 
-Path: `data/pending-articles.json`
+Publication scoring considers freshness, breaking priority, category rotation, international priority, and queue age. Fingerprints are unique across both pending and published stores.
 
-Metadata fields are intentionally small: `fingerprint`, `title`, `summary`, `url`, `sourceUrl`, `sourceName`, `category`, `imageUrl`, `queuedAt`, `priority`, plus `slug` when available.
+`worker/run.js` writes published and pending files together. A candidate is removed from pending only after the published article is written.
 
-Queue expiration is normally 12 hours. Stale candidates are removed instead of publishing days-old material. Queue max is 120.
+## Sources
 
-Crash safety comes from fingerprint checks and separate queue/published files. A candidate is removed from pending only after the published article is written.
+`lib/sources.js` + `lib/sources-extra.js` currently define 30 official ANTARA RSS sources, including dedicated international, ASEAN, sports, economy, business, lifestyle, entertainment, technology, automotive, science/environment, and regional feeds.
+
+Policy: official/reliable RSS only. Never invent or guess RSS URLs.
 
 ## Categories
 
-The fixed 12 categories are:
-
 Nasional, Internasional, Ekonomi, Bisnis, Teknologi, Olahraga, Hiburan, Lifestyle, Otomotif, Sains, Politik, Daerah.
 
-`worker/category.js` gives dedicated feeds high confidence. `ANTARA Terkini` is classified from title + summary using weighted contextual rules; the presence of a word such as `digital` does not automatically mean Teknologi.
+`worker/category.js` uses dedicated-feed confidence plus contextual keyword scoring. `ANTARA Terkini` is not automatically Nasional. Context overrides isolated words such as `digital` when the broader story is politics/business/economy.
 
-## RSS Sources
+## Article Generation
 
-`lib/sources.js` and `lib/sources-extra.js` contain 30 official ANTARA RSS endpoints. The source policy is official/reliable feeds only; never invent an RSS URL. International coverage is strengthened by dedicated ANTARA world/international/ASEAN feeds.
+`worker/source-material.js` fetches source article text when available. `lib/ai.js` performs lazy generation only for the candidate currently being published.
 
-## AI Article Generation
+The prompt requires genuine paraphrase, changed sentence/paragraph structure, no fabricated quote/person/fact/interview/statistic, no false field reporting, and no artificial ellipsis. Source attribution remains present.
 
-`lib/ai.js` performs lazy generation only for the one article being published. `worker/source-material.js` attempts to fetch the source article and extract paragraph material before generation.
+### AI Credential Status
 
-The prompt requires:
+The runtime test environment currently has `OPENAI_API_KEY` empty. Therefore the successful worker test proved source-material fallback and queue/publication behavior, but did **not** prove a live OpenAI paraphrase call.
 
-- Indonesian newsroom style
-- genuine paraphrase, not synonym replacement
-- 5-8 paragraphs when factual material supports it
-- no fabricated facts, people, interviews, statistics, citations, or direct quotes
-- no artificial `...`
-- source attribution
+Do not add fake credentials. GitHub Actions must use `secrets.OPENAI_API_KEY` when configured.
 
-Direct quotes are used only when present in source material. If the source material is unavailable, the worker falls back to the available RSS summary rather than inventing detail.
+## Existing Article Repair
 
-## Article Schema
+`worker/repair.js` detects existing published articles with suspicious truncation (`...`) or very short bodies. It repairs **one article per invocation** and refuses to replace content with raw source text when `OPENAI_API_KEY` is missing. This prevents a maintenance run from silently converting source material into copy-paste content.
 
-Published article records keep existing compatibility fields and may add:
+Command: `npm run news:repair`.
 
-- `fingerprint`
-- `sourcePublishedAt`
-- `sitePublishedAt`
-- `updatedAt`
-- `createdAt`
-- `imageSource`
-
-`publishedAt` remains the source publication timestamp for backward compatibility. `sitePublishedAt` is the time Berita Auto published the article.
-
-## Timestamp Semantics
-
-- `publishedAt` / `sourcePublishedAt`: timestamp supplied by the source feed.
-- `sitePublishedAt`: actual Berita Auto publication time.
-- `updatedAt`: only when the article is genuinely updated.
-
-Article detail UI labels these separately.
-
-## Analytics
-
-Real per-article views are **not yet active**. The repository has no persistent analytics datastore dependency or configured writable analytics backend that the application can safely query from `/admin-berita`.
-
-Do not fake views and do not commit pageview counters to `data/articles.json`. The exact blocker is persistent analytics storage plus a server-side read/query interface for views and aggregate country/region/city data.
-
-## Homepage
-
-`app/home/page.jsx` provides the editorial homepage with header, latest ticker, hero, compact cards, category sections, carousel, advertisements, and footer. `components/StoryCarousel.jsx` implements lightweight native/CSS horizontal scrolling with prev/next controls and mobile swipe behavior.
+Because the current Actions test environment lacks an OpenAI credential, existing historical truncated articles remain a documented maintenance blocker rather than being fabricated or copied.
 
 ## Article Detail
 
-`app/berita/[slug]/page.jsx` renders the full `article.content` without slicing, substring, line-clamp, max-height cutoff, or overflow clipping. Article metadata separates source publication time from site publication time, includes NewsArticle JSON-LD, related articles, source attribution, sharing, sidebar, and in-article advertising.
+`app/berita/[slug]/page.jsx` renders all `article.content` paragraphs. The article body has no `slice`, `substring`, line-clamp, max-height cutoff, or overflow hiding. It separates source publication time from Berita Auto publication time and adds related articles, share links, source attribution, article ads, sidebar, and NewsArticle JSON-LD.
 
-## Advertising
+`lib/text.js` removes only terminal ellipsis artifacts from summaries/excerpts; it does not invent missing body text.
 
-Reusable component: `components/AdSlot.jsx`.
+## Homepage
 
-Current placements: top leaderboard, in-feed, article, sidebar rectangle, footer/secondary.
+`app/home/page.jsx` contains a dense newsroom layout: breaking/latest bar, top ad, hero, side cards, carousel, compact horizontal cards, category sections, additional categories, and footer advertising.
 
-Advertising CTA uses WhatsApp `08515793801` with the approved `wa.me/628515793801?...` URL. Ads are placeholders, not fake inventory.
+`components/StoryCarousel.jsx` uses lightweight native horizontal scrolling, responsive card widths, keyboard focus, prev/next controls, and mobile swipe. No heavy carousel library is used.
+
+## Ads
+
+Reusable `components/AdSlot.jsx` with leaderboard, rectangle, in-article, sidebar, and footer placements. WhatsApp CTA: `08515793801`, URL uses the approved `wa.me/628515793801?...` target. Ads are labeled as advertising and do not enter sitemap/content.
+
+## Analytics
+
+Real views/popular/geo analytics are **not active**. Current project dependencies/configuration do not provide a persistent writable analytics datastore accessible to both public article requests and `/admin-berita`.
+
+Do not fake counts. Do not write every pageview to Git. Do not store raw visitor IP permanently. Required unblocker: persistent analytics storage plus a server-side read/write/query interface. Once provided, implement async view events, simple bot filtering, aggregate country/region/city, popular windows, and admin filters without changing auth or personal notes.
 
 ## Admin
 
-Route: `/admin-berita`.
+Route: `/admin-berita`. Auth remains Google OAuth via `auth.js`, restricted by `ADMIN_EMAILS`. Personal Notes remains `components/admin/AdminNotes.jsx`.
 
-Auth: Google OAuth through `auth.js`, restricted by `ADMIN_EMAILS`. Personal Notes remain in `components/admin/AdminNotes.jsx`.
+Current admin shows content/category/automation/activity. Views and geo filters are intentionally absent until real analytics persistence exists.
 
-Analytics views are not displayed as fake numbers. Once persistent analytics infrastructure is configured, admin analytics should be added without changing auth or notes behavior.
+## SEO and Sitemap
 
-## SEO
+Canonical URL helper: `lib/article-url.js`.
 
-Canonical URLs come from `lib/article-url.js`.
+Article metadata: title, description, canonical, OpenGraph, Twitter, NewsArticle JSON-LD, datePublished/dateModified, publisher/author as Berita Auto, mainEntityOfPage.
 
-Article metadata includes title, description, canonical, OpenGraph, Twitter, and NewsArticle JSON-LD. Automated authorship is represented honestly as Berita Auto rather than a fabricated reporter.
+`app/sitemap.js` includes homepage, all 12 categories, and published canonical articles only. lastmod uses actual latest article/update times instead of `new Date()` on every request. Pending/admin/auth/API/private URLs are excluded.
 
-`app/robots.js` and existing Google verification behavior must not be removed.
+Preserve robots, Google verification, old redirects, and canonical behavior.
 
-## Sitemap
+## Persistence and Vercel
 
-`app/sitemap.js` includes:
+`lib/storage.js` reads published/pending JSON from the feature branch raw GitHub content on Vercel, falling back locally. Worker writes remain file-based because the existing application architecture uses Git as its persistent data channel.
 
-- homepage
-- all 12 category pages
-- published canonical article URLs
-
-Pending, admin, auth, API, and other private URLs are excluded.
-
-Homepage and category `lastModified` values derive from latest published content, not `new Date()` on every request. Article lastmod prefers `updatedAt`, then `sitePublishedAt`, then source publication time.
-
-## Important File Map
-
-- `lib/rss.js` — RSS parsing/fetching
-- `lib/sources.js` — core official sources
-- `lib/sources-extra.js` — additional official sources
-- `lib/ai.js` — article paraphrase/generation
-- `worker/source-material.js` — source article material extraction
-- `worker/category.js` — deterministic category classifier
-- `worker/normalize.js` — URL normalization/fingerprinting
-- `worker/strategy.js` — queue intake, freshness, rotation, publication selection
-- `worker/run.js` — single-run orchestration
-- `lib/storage.js` — published + pending JSON persistence
-- `data/articles.json` — published articles
-- `data/pending-articles.json` — pending candidates
-- `app/home/page.jsx` — homepage
-- `components/StoryCarousel.jsx` — carousel
-- `app/berita/[slug]/page.jsx` — article detail
-- `app/kategori/[slug]/page.jsx` — category pages
-- `app/admin-berita/page.jsx` — admin console
-- `app/sitemap.js` — semantic sitemap
-- `vercel.json` — admin headers and data-only deployment ignore behavior
-- `.github/workflows/feature-branch-scheduler.yml` on `main` — production scheduler
-- `.github/workflows/auto-news.yml` on application branch — manual worker workflow
+`vercel.json` keeps admin no-store/noindex headers and ignores commits that change only `data/articles.json` and/or `data/pending-articles.json` so worker data commits do not require a UI rebuild. This behavior has been empirically observed: a data-only worker commit produced a canceled/non-active Vercel deployment, while code commits produced READY Production deployments.
 
 ## Scheduler
 
-Scheduler path on `main`: `.github/workflows/feature-branch-scheduler.yml`.
+`main/.github/workflows/feature-branch-scheduler.yml` is the production scheduler. It checks out `feature/auto-news-mvp`, Node 22 + npm cache, uses `npm ci --prefer-offline --no-audit`, runs `npm run news:run`, stages both published and pending data, rebases onto current feature HEAD, and pushes without force.
 
-Trigger: `2-59/5 * * * *` plus manual dispatch.
+Concurrency: `auto-news`, `cancel-in-progress: false`.
 
-The workflow checks out `feature/auto-news-mvp`, uses Node 22, npm cache, `npm ci --prefer-offline --no-audit`, runs `npm run news:run`, commits queue + article data, rebases on the latest application branch, and pushes without force.
+Default target is one article each approximately five minutes. No self-dispatch chain is used because the existing cron is the simpler mechanism. Historical cadence should be verified from actual run timestamps; do not invent a 5-minute empirical result.
 
-Concurrency group: `auto-news`, `cancel-in-progress: false`.
+## Git Data API Procedure
 
-Self-dispatch chain is not used. Cron remains the simple recovery mechanism. If historical runs prove persistent misses, add recovery only after measuring the real gaps.
-
-## Git Commit Procedure
-
-1. Fetch latest target branch HEAD.
-2. Fetch current target files.
-3. Inspect the current architecture and relevant diff.
-4. Get the current base tree.
-5. Create blobs with Git Data API.
-6. Create a tree on the latest base tree.
-7. Re-fetch HEAD immediately before commit/ref update.
-8. If HEAD changed, rebuild the tree and commit on the latest HEAD.
-9. Create the commit.
-10. Update the branch ref with `force=false` only.
-11. Fetch committed files/commit and verify.
-12. If the worker generated data concurrently, never overwrite it.
+1. Fetch latest target HEAD.
+2. Fetch target files/current tree.
+3. Create blobs.
+4. Create tree on current base.
+5. Re-fetch HEAD immediately before commit/ref update.
+6. If HEAD changed, rebuild tree/commit on newest HEAD.
+7. Create commit.
+8. `update_ref` with `force=false` only.
+9. Fetch committed files/commit and verify.
+10. Never overwrite worker-generated data commits.
 
 ## Commit Convention
 
-Use `feat:`, `fix:`, `perf:`, `refactor:`, `docs:`, `chore:`.
+`feat:`, `fix:`, `perf:`, `refactor:`, `docs:`, `chore:`.
 
 ## Deployment Procedure
 
-Application code belongs on `feature/auto-news-mvp`. After commit, verify the automatic Vercel Production deployment.
+Production project: `berita-auto`.
+Production branch: `feature/auto-news-mvp`.
 
-Production verification must confirm:
+After application code commit, verify Vercel deployment environment=Production, target=production, branch=feature/auto-news-mvp, intended SHA/descendant, state READY, alias `berita-auto.vercel.app`.
 
-- project: `berita-auto`
-- environment: Production
-- branch: `feature/auto-news-mvp`
-- intended SHA or descendant
-- status: READY
-- domain: `berita-auto.vercel.app`
-
-If automatic deployment does not occur and the available tools cannot safely create one, use Vercel Create Deployment with the exact latest application SHA; never deploy an older commit.
-
-## Vercel Configuration
-
-`vercel.json` keeps admin no-store/noindex headers and ignores commits that modify only `data/articles.json` and/or `data/pending-articles.json` for Vercel build purposes. This is designed to avoid UI rebuilds on worker-only data commits. Behavior must be re-verified whenever Vercel changes.
+If automatic deployment is not triggered and tool support allows safe creation, deploy exact latest application SHA. Never deploy an older SHA as a workaround.
 
 ## Environment Variables
 
-Names only:
+Names only; never document values:
 
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL`
@@ -239,15 +168,9 @@ Names only:
 - `GOOGLE_CLIENT_SECRET`
 - `AUTH_SECRET`
 
-Never document actual secret values.
+## Build and Test
 
-## Secret Policy
-
-Never commit `.env`, API keys, OAuth secrets, passwords, GitHub tokens, or analytics credentials.
-
-## Build Procedure
-
-Required commands when runtime is available:
+Runtime commands:
 
 `npm ci`
 
@@ -255,52 +178,41 @@ Required commands when runtime is available:
 
 `npm run news:run`
 
+`npm run news:repair`
+
+Do not claim build success unless a real build log exists.
+
 ## DO NOT BREAK
 
-Preserve Google OAuth, `ADMIN_EMAILS`, Personal Notes, article IDs/fingerprints/slugs, canonical URLs, old redirects, RSS dedupe, pending/published dedupe, one-at-a-time publishing, sitemap, robots, Google verification, advertising CTA, and production branch strategy.
+Google OAuth, `ADMIN_EMAILS`, Personal Notes, article IDs/fingerprints/slugs, canonical URLs, old redirects, RSS dedupe, queue dedupe, one-at-a-time publisher, sitemap, robots, Google verification, advertising CTA, production branch, and non-force Git history.
 
 ## Before Any AI Change
 
-1. Read `SKILL.md` completely.
-2. Read `AGENTS.md` if present.
-3. Fetch the latest repository.
-4. Confirm the branch.
-5. Fetch the current target files.
-6. Understand the existing architecture.
-7. Preserve existing behavior.
-8. Implement the smallest safe change.
-9. Build/test.
-10. Commit non-force.
-11. Re-fetch source after commit.
-12. Verify production when deployment is requested.
-13. Update `SKILL.md` when architecture changes.
-
-## Source of Truth
-
-The current repository wins over old conversation context.
-
-## Documentation Maintenance
-
-Update this file whenever architecture, worker, queue, publisher, scheduler, auth, analytics, SEO, storage, deployment, or branch strategy changes.
+Read this file completely, read `/AGENTS.md`, fetch latest repository, confirm branch, inspect current files, preserve behavior, implement minimally, run tests/build, commit with Git Data API non-force, re-fetch source after commit, verify Production if requested, and update this file when architecture changes.
 
 ## Current Implementation Status
 
-✅ queue-first ingestion/publisher implemented
-✅ one publication per worker run implemented
-✅ 24/48 ingestion targets implemented
-✅ 30 official RSS sources configured
-✅ international RSS coverage strengthened
-✅ deterministic contextual classifier improved
-✅ source-material fetch + lazy AI generation implemented
-✅ full article rendering/no body truncation implemented
-✅ compact homepage + carousel implemented
-✅ semantic sitemap implemented
-✅ Vercel data-only ignore optimization implemented
-⚠️ real reader views/popular analytics/admin analytics not active because persistent analytics storage is not configured
-⚠️ real five-minute historical cadence remains a runtime-history verification item; cron target is configured
+✅ queue-first 24/48 ingestion
+✅ target queue 60 / low watermark 30 / max 120
+✅ one publication per worker run
+✅ 30 official RSS sources
+✅ stronger international coverage
+✅ contextual 12-category classifier
+✅ full article detail body rendering
+✅ dense homepage
+✅ carousel
+✅ semantic sitemap
+✅ ads retained
+✅ non-force Git procedure documented
+✅ SKILL.md and AGENTS.md
+✅ Vercel data-only rebuild suppression observed
+⚠️ live OpenAI paraphrase not empirically verified because `OPENAI_API_KEY` is empty in the available Actions environment
+⚠️ existing historical truncated articles are not fully regenerated for the same credential reason
+⚠️ real reader view/geo analytics unavailable without a persistent analytics datastore
+⚠️ scheduler five-minute history from the new `main` workflow is not yet empirically verified by a run after the latest scheduler commit
 
 ## Last Verified
 
-Application HEAD at documentation authoring: `3c20ef76575508413fe63f9c64d4dbe49768e31d` before this documentation/queue implementation batch.
+Production READY deployment: `7e12ec32da41433692fdf9b36fb980909ab4cd22` at `berita-auto.vercel.app`.
 
-Do not write a new Production SHA here until Vercel reports READY for the intended application commit.
+Application branch may advance by worker data commits without a Vercel UI rebuild; do not treat a data-only SHA as a code deployment.
