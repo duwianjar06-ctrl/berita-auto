@@ -13,9 +13,47 @@ Production branch: `feature/auto-news-mvp`
 Never force-push or force-update refs.
 
 ## Core Architecture
-Official RSS -> normalize/dedupe/classify -> pending queue -> select one -> source material -> provider registry (Gemini -> optional OpenAI) -> factual fallback -> image enrichment -> `data/articles.json`.
+Official RSS -> normalize/dedupe/classify -> pending queue -> select one/more according to adaptive catch-up -> source material -> provider registry (Gemini -> optional OpenAI) -> factual fallback -> image enrichment -> persistent publication storage.
 
-`data/articles.json` and `data/pending-articles.json` remain the worker publication stores. Pending candidates are never public. One worker run publishes at most one article.
+### Runtime Publication Architecture
+When Upstash Redis is configured, it is the live source of truth for published articles and the pending queue. GitHub JSON files are migration/backup snapshots, not the live production datastore.
+
+Production publication service is exposed through `/api/cron/news-publish` and delegates to the shared `runPublicationCycle({trigger, now})` implementation in `worker/run.js`. The endpoint never performs Git operations. It authenticates with `CRON_SECRET`, acquires the shared Redis publication lock, runs the normal queue/AI/image pipeline, writes the result to persistence, records telemetry, and releases the lock.
+
+Current trigger roles:
+- Primary target: Vercel Cron at approximately every five minutes, only after the project plan is verified to support the required interval.
+- Fallback: GitHub Actions workflow on `main`, which calls the same secured publication endpoint and does not write Git data itself.
+- Manual: the same shared publication cycle may be called by controlled recovery tooling.
+
+Do not implement a second publication business-logic path. All triggers must call the same publication service.
+
+### Persistence and Migration
+Persistence adapter: `lib/persistence.js` using the existing Upstash Redis REST configuration.
+
+Keys currently used by live publication:
+- `ba:news:articles`
+- `ba:news:pending`
+- `ba:news:publication-lock`
+- existing pipeline keys under `ba:pipeline:*`
+
+On first access when a key is absent, the storage layer performs an idempotent migration from the existing `data/articles.json` or `data/pending-articles.json` snapshot. Existing IDs/fingerprints are preserved. Later production reads/writes use Redis only when persistence is configured.
+
+Production must fail closed rather than silently falling back to stale bundled or GitHub data when persistent storage is unavailable.
+
+### Publication Lock
+`lib/persistence.js` provides an atomic Redis `SET ... NX EX` lock used by `runPublicationCycle` so Vercel Cron, GitHub fallback, and other recovery triggers cannot execute as concurrent writers. Lock TTL is intentionally slightly longer than the target worker runtime and must never be replaced by an in-memory/global JavaScript lock.
+
+### Adaptive Publication Policy
+`worker/strategy.js` currently uses:
+- normal: 1 publication
+- delayed: 2 publications
+- stale: 3 publications
+- long outage: 5 publications
+- hard maximum: 5
+
+The queue remains bounded at low watermark 30, target 60, max 120, with a 12-hour freshness cutoff. Catch-up is recovery only; normal cadence remains approximately one publication per five minutes.
+
+`data/articles.json` and `data/pending-articles.json` are still maintained for backup/migration and Git-based fallback compatibility. The live worker must not require a Git commit/push to make a production publication visible when Redis is configured.
 
 ## Queue and Publication
 Configuration remains in `worker/strategy.js`:
@@ -24,13 +62,14 @@ Configuration remains in `worker/strategy.js`:
 - queue target 60
 - low watermark 30
 - queue max 120
-- max publications per run 1
+- adaptive max publications: 1/2/3/5
+- hard publication max 5
 - freshness cutoff 12 hours
 - RSS concurrency 8
-- AI timeout 18s
+- AI timeout 18s baseline
 - source material timeout 5s
 
-Canonical GitHub schedule remains `2-59/5 * * * *` with concurrency group `auto-news` and no overlapping writer. GitHub schedule dispatch jitter is treated separately from worker runtime.
+Pending candidates are never public. Publication timestamps use actual `sitePublishedAt` time; never synthesize five-minute timestamps for articles published together.
 
 ## Shared Admin Notes
 `components/admin/AdminNotes.jsx` is now a thin client wrapper around `AdminWorkspace` and does not use localStorage as the source of truth.
@@ -81,13 +120,13 @@ Provider errors normalize into safe classes such as rate limit, timeout, server 
 
 Gemini environment:
 - `GEMINI_API_KEY` — GitHub Actions secret; never commit/log.
-- `GEMINI_MODEL` — repository variable; defaults to `gemini-2.5-flash-lite`.
+- `GEMINI_MODEL` — repository variable.
 
 OpenAI environment:
 - `OPENAI_API_KEY` — optional.
 - `OPENAI_MODEL` — optional.
 
-Cloudflare Workers AI was audited against current official REST documentation but is not implemented because this repository has no verified Cloudflare account ID/token/configuration. Do not add fake credentials or endpoints. citeturn236447search0turn236447search5
+Cloudflare Workers AI was audited against current official REST documentation but is not implemented because this repository has no verified Cloudflare account ID/token/configuration. Do not add fake credentials or endpoints.
 
 Article generation preserves factual-only fallback and backward compatibility. New articles may contain `generationProvider`, `generationModel`, `generationAt`, and `generationDurationMs`.
 
@@ -97,11 +136,11 @@ AI output must have title, excerpt, and content. Output cleaning removes markdow
 Historical repair remains Gemini-first and must skip overwrite when generation falls through to raw fallback.
 
 ## Scheduler & Publication Cadence
-`main/.github/workflows/feature-branch-scheduler.yml` executes the application branch with one writer and non-force push. It now passes Upstash REST credentials to the worker for pipeline telemetry.
+The preferred production timing engine is Vercel Cron when the project plan exposes a supported five-minute interval. The secure path is `/api/cron/news-publish` using `CRON_SECRET` and the same shared publication cycle.
 
-Worker telemetry is persisted through `lib/pipeline.js` when Upstash exists. Stages include reading state, discovering, normalizing, queuing, selecting, image processing, paraphrasing, validating, and publishing. Persisted run summaries include provider, AI duration, worker duration, queue count, candidates found, accepted/rejected counts, status, and last error.
+GitHub Actions on `main` is a fallback/watchdog only. Its workflow calls the secured Vercel endpoint and must not contain a second copy of worker business logic. Its schedule is deliberately lower-frequency than the primary target and exists to recover stale publication when Vercel Cron is unavailable or delayed.
 
-Target cadence remains approximately one publication per five minutes. GitHub schedule dispatch is an external platform constraint: previous audit showed normal job execution of roughly 30 seconds after dispatch, while some scheduled runs were delayed by platform dispatch. Do not claim scheduler cadence is fixed until multiple sequential publication intervals are empirically observed.
+Target cadence remains approximately one publication per five minutes. Do not call the cadence verified until sequential real publication timestamps have been observed in production.
 
 ## Public Search
 Canonical route: `/cari?q=keyword`.
@@ -128,7 +167,7 @@ Public internal linking remains article -> category, article -> related articles
 ## Timestamp Semantics
 `sourcePublishedAt` is the source publisher timestamp; `sitePublishedAt` is Berita Auto publication time; `updatedAt` is an actual content update timestamp when available.
 
-Public article metadata now visually separates source and Berita Auto timestamps into distinct blocks. Compact cards show the publication time as `Terbit di Berita Auto` rather than placing two long timestamps side by side.
+Public article metadata visually separates source and Berita Auto timestamps into distinct blocks. Compact cards show the publication time as `Terbit di Berita Auto` rather than placing two long timestamps side by side.
 
 ## Admin Automation / News Pipeline
 `AdminWorkspace` contains a real pipeline monitor backed by `/api/admin/pipeline` and persisted worker state.
@@ -162,20 +201,37 @@ All admin APIs require authenticated authorized-admin email. Payloads have basic
 Required when environment permits:
 - `npm ci --prefer-offline --no-audit`
 - `npm run build`
+- `node --check worker/run.js`
 - controlled AI failover tests
 - production route checks
+- real cron/trigger publication verification
 
 If local npm execution is not available, Vercel/CI build evidence must be reported exactly rather than inferred.
 
 ## DO NOT BREAK
-Google OAuth, `ADMIN_EMAILS`, shared Notes persistence, source/category distribution, source filters, recent-50 distribution, dominance warning, queue/pending behavior, one-article-per-run, canonical URLs, redirects, article image aspect ratio, analytics, ads, robots, sitemap, and non-force Git history.
+Google OAuth, `ADMIN_EMAILS`, shared Notes persistence, source/category distribution, source filters, recent-50 distribution, dominance warning, queue/pending behavior, one-article-per-run normal cadence, adaptive catch-up, canonical URLs, redirects, article image aspect ratio, analytics, ads, robots, sitemap, and non-force Git history.
+
+## Current Runtime Environment Names
+Production/application runtime may require:
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
+- `CRON_SECRET`
+- `GEMINI_API_KEY`
+- `GEMINI_MODEL`
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL`
+
+Never put actual values in source or documentation.
 
 ## Project Work Log Baseline
-1. Public search 404 — currently being verified after route implementation.
+1. Public search 404 — resolved in current route implementation; retain regression coverage.
 2. Gemini live generation — Blocked until `GEMINI_API_KEY` existence can be verified and a real publication test can run.
-3. Publication cadence — Perlu Verifikasi until sequential production publication gaps are observed.
+3. Publication cadence — Perlu Verifikasi until sequential production publication gaps are observed with the new trigger architecture.
 4. Authenticated admin visual/CRUD — Perlu Verifikasi unless an authorized Google session becomes available.
-5. SEO/news sitemap audit — Perlu Verifikasi until production XML is checked after the deployment.
+5. SEO/news sitemap audit — Perlu Verifikasi until production XML is checked after the latest production deployment.
+6. Persistent news datastore migration — Perlu Verifikasi until Upstash runtime is proven in Production.
+7. Vercel five-minute Cron capability — Perlu Verifikasi because the current Vercel MCP does not expose the project plan/tier.
+8. Production deployment of the DB-backed publication commit — Perlu Verifikasi after the latest Git-integrated deployment/build completes.
 
 ## Current Status
 ✅ persistent admin Notes source code
@@ -187,13 +243,21 @@ Google OAuth, `ADMIN_EMAILS`, shared Notes persistence, source/category distribu
 ✅ Google News sitemap implementation
 ✅ robots sitemap exposure
 ✅ timestamp separation CSS/card treatment
+✅ Git probe cleanup
+✅ DB-backed publication storage implementation
+✅ shared publication cycle and Redis publication lock
+✅ secured publication endpoint
+✅ GitHub fallback workflow that calls the secured endpoint
 ⚠️ persistent database runtime still depends on verified Upstash credentials
-⚠️ live Gemini generation still depends on verified `GEMINI_API_KEY`
-⚠️ publication cadence requires sequential production evidence after new telemetry is live
+⚠️ Vercel five-minute Cron support/plan is not exposed by the available MCP
+⚠️ latest DB-backed application deployment has not yet reached READY after the initial build fix
+⚠️ publication cadence requires sequential production evidence after the new runtime is live
 ⚠️ authenticated admin CRUD/visual verification requires an authorized session
 
 ## Manual Setup
-If Upstash is not already configured in Vercel and GitHub Actions, create/use the existing project Upstash Redis database and set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` in the appropriate Vercel Production and GitHub Actions environments. Do not create a second database unless the existing backend cannot support the required persistence.
+If Upstash is not already configured in Vercel and GitHub Actions, use the existing project Upstash Redis database and set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` in the appropriate Vercel Production and GitHub Actions environments. Do not create a second database unless the existing backend cannot support the required persistence.
+
+Set `CRON_SECRET` in the same secure environment before enabling the Vercel Cron or GitHub fallback trigger. Do not send the secret through chat.
 
 If Gemini is not configured, add repository secret `GEMINI_API_KEY` and repository variable `GEMINI_MODEL`; never send the key through chat.
 
