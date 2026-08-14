@@ -13,129 +13,139 @@ Production branch: `feature/auto-news-mvp`
 Never force-push or force-update refs.
 
 ## Architecture
-Official RSS -> normalize/dedupe/classify -> pending queue (`data/pending-articles.json`) -> select one -> source material -> AI paraphrase when configured -> image enrichment -> published store (`data/articles.json`) -> Next.js/Vercel.
+Official RSS -> normalize/dedupe/classify -> pending queue (`data/pending-articles.json`) -> select one -> source material -> Gemini/OpenAI/factual fallback -> image enrichment -> published store (`data/articles.json`) -> Next.js/Vercel.
 
-Ingestion and publication are separate. Intake may add 24 or 48 candidates; a worker run publishes at most one article.
+Ingestion and publication remain separate. Worker intake may add 24 or 48 candidates; one worker run publishes at most one article.
 
-## Important Configuration
-Defined in `worker/strategy.js`:
+## Queue and Publication
+Configuration in `worker/strategy.js`:
 - normal ingestion max: 24
 - catch-up ingestion max: 48
 - queue target: 60
 - low watermark: 30
 - queue max: 120
-- max publication per run: 1
+- max publications per run: 1
 - freshness cutoff: 12 hours
 - RSS concurrency: 8
 - AI timeout: 18s
 - source material timeout: 5s
 
 Production cron: `2-59/5 * * * *`.
+Pending candidates are not public and are excluded from homepage, categories, article reads, analytics ranking, sitemap, and admin published distribution. A candidate leaves pending only after successful publication.
 
-## Queue and Publication
-`data/pending-articles.json` stores candidate metadata only. Pending is not public and is excluded from homepage, categories, article reads, analytics ranking, and sitemap.
+## Sources and Categories
+`lib/sources.js` + `lib/sources-extra.js` define the official/reliable RSS source set. Never invent RSS URLs.
+Categories: Nasional, Politik, Ekonomi, Bisnis, Internasional, Teknologi, Olahraga, Hiburan, Lifestyle, Otomotif, Sains, Daerah.
+`worker/category.js` uses dedicated-feed confidence plus contextual keyword scoring.
 
-When pending <30, intake targets 48 new candidates. At 30-59, intake targets 24. At >=60, normal refill is skipped unless breaking/fresh logic is safely added. Queue max is 120. Candidates older than 12h are normally expired.
+## AI Article Generation Providers
+`lib/ai.js` is the single provider/fallback path used by the publication worker and historical repair.
 
-Selection considers freshness, breaking priority, category rotation, international priority, and queue age. Fingerprints are unique across pending and published data.
+Provider order:
+1. Gemini primary when `GEMINI_API_KEY` is configured.
+2. OpenAI secondary when `OPENAI_API_KEY` is configured.
+3. Factual non-AI fallback.
 
-`worker/run.js` writes published and pending files together; a candidate is removed from pending only after successful publication.
+Cloudflare Workers AI is not implemented because no current project credential/configuration justified adding another provider.
 
-## Sources
-`lib/sources.js` + `lib/sources-extra.js` define 30 official/reliable ANTARA RSS sources spanning international, ASEAN, sports, economy, business, lifestyle, entertainment, technology, automotive, science/environment, and regional coverage.
-Never invent or guess RSS URLs.
+### Gemini
+Environment:
+- `GEMINI_API_KEY` — GitHub Actions secret only; never commit or log it.
+- `GEMINI_MODEL` — GitHub Actions repository variable; defaults to `gemini-2.5-flash-lite`.
 
-## Categories
-Nasional, Politik, Ekonomi, Bisnis, Internasional, Teknologi, Olahraga, Hiburan, Lifestyle, Otomotif, Sains, Daerah.
+The default model is currently listed by Google as the stable `gemini-2.5-flash-lite` model with structured output support. Google currently lists a shutdown date of October 16, 2026 and recommends `gemini-3.1-flash-lite`, so `GEMINI_MODEL` must remain configurable and should be migrated before that date.
 
-`worker/category.js` uses dedicated-feed confidence plus contextual keyword scoring. `ANTARA Terkini` is not automatically Nasional.
+Gemini is called through the Google Generative Language API with `x-goog-api-key`. Structured JSON output requests `title`, `excerpt`, and `content`.
 
-## Article Generation
-`worker/source-material.js` fetches factual source material. `lib/ai.js` performs lazy generation for the single candidate being published.
+### OpenAI
+Environment:
+- `OPENAI_API_KEY` — optional secret.
+- `OPENAI_MODEL` — optional repository variable; default `gpt-4o-mini`.
 
-The AI prompt requires genuine paraphrase, changed sentence/paragraph structure, no fabricated quote/person/fact/interview/statistic, no false field reporting, and no artificial ellipsis. Source attribution remains present.
+OpenAI is secondary only and is never a publication blocker.
 
-### AI Credential Status
-The available Actions environment did not prove a live OpenAI paraphrase call. `OPENAI_API_KEY` must be supplied as a GitHub Actions secret; never create or commit a key.
+### Provider failure behavior
+Provider failures are classified as rate-limited, timeout, server error, invalid response, unavailable, or generic failure. No infinite retries. A failed Gemini call moves to OpenAI when configured, then to factual fallback. A provider failure never changes the one-publication-per-run rule.
 
-## Existing Article Repair
-`worker/repair.js` detects suspiciously short or ellipsis-truncated published articles and repairs one article per invocation when a real OpenAI key is available.
+No API response body or credential is logged. Logs use safe status labels such as `provider=gemini status=rate_limited` and `provider=fallback status=used`.
+
+### Article validation
+AI output must contain non-empty title, excerpt, and content. The validator removes markdown JSON fences/wrapper text, rejects placeholders and artificial `...`, requires multiple paragraphs based on material length, rejects content that is effectively copied source material, and requires sufficient length when factual material is sufficient.
+
+The prompt forbids fabricated quotes, interviewees, reporters, eyewitnesses, locations, research, statistics, financial figures, government statements, chronology, or claims of on-location reporting. Direct quotes may only survive when actually present in source material.
+
+Returned metadata:
+- `generationProvider`
+- `generationModel`
+- `generationAt`
+
+Existing articles without these fields remain backward-compatible.
+
+### Factual non-AI fallback
+Fallback uses only available factual pieces: article title, RSS summary, extracted source-material paragraphs, source attribution, and source URL. It does not invent facts. When material is insufficient, the fallback remains short rather than fabricating detail.
+
+## Historical Article Repair
+`worker/repair.js` detects suspiciously short or ellipsis-truncated articles and calls the same Gemini -> OpenAI -> fallback generation path.
+Historical repair is safer than normal publishing: if generation ends in `fallback`, repair is skipped and the historical article is not overwritten with a raw/non-AI replacement.
 Command: `npm run news:repair`.
-Without the credential it refuses to silently replace content with copied source text. Historical truncated articles therefore remain an external-credential maintenance blocker.
+
+## Homepage Editorial Intro
+The homepage `BERITA HARI INI` section is an editorial introduction explaining the multi-source value proposition without claiming complete internet coverage.
+
+Current direction: explain that important news from various public sources is available in one place, reduce the need to open many publisher sites, and show compact supporting indicators.
+
+Dynamic source count is computed from current published article `sourceName` values. Category count uses the existing category architecture. No source count is hardcoded.
+
+The intro uses CSS/SVG-style geometry only, with subtle fade/stagger motion. It must respect `prefers-reduced-motion`, remain readable on mobile, and avoid fake `LIVE` indicators.
+
+## Advertising UI Policy
+`components/AdSlot.jsx` is the reusable advertising component for leaderboard, rectangle/sidebar, inline-article, and footer placements.
+
+Public ad copy should be professional and clearly labeled `IKLAN`. The existing WhatsApp number must never appear as visible text. The number may remain only inside the approved WhatsApp href.
+
+CTA label: `Pasang Iklan ↗` or equivalent professional wording. External WhatsApp links opened in a new tab use `rel="noopener noreferrer"`.
+
+`components/ads.css` supplies the lightweight shared ad visual system: gradients, abstract editorial document/spotlight shapes, soft transitions, responsive stacking, and reduced-motion support. No stock image, GIF, video, heavy animation library, or copyrighted visual asset is required.
+
+Ads are not articles. They must not be included in public search results, sitemap entries, NewsArticle JSON-LD, or popular-article ranking. Existing search, sitemap, and analytics implementations therefore remain unchanged.
 
 ## Article Detail
-`app/berita/[slug]/page.jsx` renders every body paragraph. There is no slice/substring/line-clamp/max-height/overflow cutoff in the article body. Source time and site publication time are separate. Related articles, share links, source attribution, ads, sidebar, optional popular ranking, and NewsArticle JSON-LD are supported.
+`app/berita/[slug]/page.jsx` renders every body paragraph and preserves source attribution, source time, site publication time, related articles, ads, share links, and NewsArticle JSON-LD. Do not introduce body truncation.
 
-## Homepage
-Dense newsroom layout: latest/breaking bar, featured story, compact cards, horizontal cards, carousel, optional popular section, categories, ads, footer.
-`components/StoryCarousel.jsx` uses lightweight native scrolling with responsive cards, swipe, controls, keyboard focus, and reduced-motion behavior.
-
-## Ads
-Reusable `components/AdSlot.jsx` supports top/in-feed/article/sidebar/footer placements. WhatsApp CTA: `08515793801` using the approved `wa.me/628515793801?...` URL.
+The article-detail image aspect-ratio policy is an existing compatibility requirement: preserve the source image proportions rather than redesigning article hero media for the homepage treatment.
 
 ## Analytics
-Analytics plumbing is implemented but optional.
-Public event route: `app/api/analytics/view/route.js`.
-Adapter: `lib/analytics.js`.
-Tracker: `components/ArticleViewTracker.jsx`.
-Admin endpoint: `app/api/admin/analytics/route.js`.
-
-Persistence backend: Upstash Redis REST, activated only when both exist:
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
-
-The adapter uses durable Redis structures, aggregate country/region/city data from Vercel geo headers, bot filtering, and five-minute per-article cooldown. Popular windows and admin filters are supported. No raw full IP is persistently stored. When env vars are absent, analytics no-ops and no fake values are rendered.
+Analytics is optional and uses Upstash Redis REST only when both `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` exist. No fake analytics values are rendered when unavailable.
 
 ## Admin
-`/admin-berita` remains protected by existing Google OAuth and `ADMIN_EMAILS`. Personal Notes remains `components/admin/AdminNotes.jsx`. Analytics controls are shown only when the real persistence backend is configured.
+`/admin-berita` remains protected by Google OAuth and `ADMIN_EMAILS`. Personal Notes remains `components/admin/AdminNotes.jsx`.
 
 ### Admin Distribution Dashboard
-The `DISTRIBUSI` area keeps the existing `Distribusi Kategori` section first and adds `Distribusi Sumber Berita` directly below it.
+The existing `Distribusi Kategori` remains first, with `Distribusi Sumber Berita` directly below it. Source distribution is derived from real published `article.sourceName` data through `lib/admin-source-distribution.js`, excludes pending candidates, handles missing source names as `Sumber tidak diketahui`, sorts by count, and supports source filtering with existing query-state. Recent-50 distribution and >50% dominance warning are preserved.
 
-Source distribution is derived from the published article array returned by `readArticles()`, using actual `article.sourceName`. Pending candidates are never included. Articles missing `sourceName` are grouped as `Sumber tidak diketahui` so the distribution still reconciles to the published article total without inventing metadata.
+No rebuild of the source distribution architecture is permitted unless a new requirement actually needs it.
 
-Implementation helper: `lib/admin-source-distribution.js`.
-It performs one pass over the published articles and returns source count, contribution percentage, latest publication timestamp, and dominant category. Default order is descending article count, then latest publication, then source name.
-
-The dashboard shows Total Sumber, Total Berita, Sumber Terbesar, Dominasi, per-source count/percentage/progress bar, a >50% dominance warning, inline `Lihat Semua Sumber` detail table, and `Distribusi 50 Berita Terbaru` as a secondary diversity check. Source rows are links using the existing admin URL/query-state pattern (`source=...`) and preserve category/query state. The existing article pagination/filter list now applies `source` together with category and search filters, including the `Sumber tidak diketahui` fallback.
-
-Source distribution is distinct from Source Monitor semantics: distribution measures published articles by `sourceName`; Source Monitor measures RSS/source health and fetching state. No source counts are hardcoded, mocked, randomised, or derived from analytics views.
-
-## SEO and Sitemap
-Article metadata includes title, description, canonical, OpenGraph, Twitter, NewsArticle JSON-LD, datePublished/dateModified, publisher/author as Berita Auto, and mainEntityOfPage.
-`app/sitemap.js` includes homepage, all 12 categories, and published canonical articles only. lastmod is semantic, based on actual content timestamps. Pending/admin/auth/API/private routes are excluded.
+### Admin News Pipeline
+No dedicated Admin News Pipeline component was present in the audited current repository. Do not invent mock pipeline states. If a real pipeline monitor is added later, AI provider/model/state must derive from actual worker state or published `generationProvider` metadata and must never expose secrets.
 
 ## Persistence and Vercel
-`lib/storage.js` reads published/pending JSON from the feature branch raw GitHub content on Vercel. Git remains the existing persistent data channel for worker publication.
-`vercel.json` suppresses rebuilds for data-only changes to `data/articles.json` and `data/pending-articles.json`; code commits still deploy normally.
+`lib/storage.js` reads published/pending JSON from the feature branch raw GitHub content. Git remains the persistence channel for worker publication.
+`vercel.json` suppresses UI rebuilds for data-only changes to `data/articles.json` and `data/pending-articles.json`; code commits still deploy.
 
 ## Scheduler
 Canonical workflow: `main/.github/workflows/feature-branch-scheduler.yml`.
 
-Final scheduler behavior:
-- cron: `2-59/5 * * * *`
-- `workflow_dispatch` retained
-- checkout `feature/auto-news-mvp`
-- Node 22 + npm cache
-- `npm ci --prefer-offline --no-audit` only; no per-run lock regeneration
-- `npm run news:run`
-- stage only `data/articles.json` and `data/pending-articles.json`
-- no empty commit
-- fetch/rebase latest feature branch
-- push non-force
-- concurrency group `auto-news`, `cancel-in-progress: false`
+The scheduler checks out `feature/auto-news-mvp`, uses Node 22, runs `npm ci --prefer-offline --no-audit`, runs `npm run news:run`, stages only published/pending data, rebases on the latest feature branch, and pushes non-force.
 
-The repository lockfile was permanently synchronized during scheduler bootstrap. Successful Actions run #19 proved `npm ci`, worker execution, queue+published data commit, rebase, and push. The lockfile is now committed on the application branch; later scheduler runs do not reconcile it.
+Gemini scheduler env:
+- `GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}`
+- `GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}`
 
-## Scheduler Verification
-Successful bootstrap run:
-- workflow run: `31773483286` (run #19)
-- result: all steps success
-- one article published
-- published site timestamp: `2026-08-14T05:35:45.119Z`
-- queue data persisted in `data/pending-articles.json`
+Optional OpenAI scheduler env:
+- `OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}`
+- `OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}`
 
-Only one publication run has been empirically observed after the final lock fix. A 3-run/5-minute cadence series has not been observed yet; do not invent gaps.
+Never claim a secret is configured unless a connector exposes proof. Code readiness and secret configuration are separate states.
 
 ## Git Data API Procedure
 1. Fetch latest target HEAD.
@@ -145,75 +155,45 @@ Only one publication run has been empirically observed after the final lock fix.
 5. Re-fetch HEAD immediately before commit/ref update.
 6. If HEAD changed, rebuild tree/commit on newest HEAD.
 7. Create commit.
-8. `update_ref` with `force=false` only.
+8. Update ref with `force=false` only.
 9. Re-fetch committed files/commit and verify.
 10. Never overwrite worker-generated data commits.
 
-## Commit Convention
-`feat:`, `fix:`, `perf:`, `refactor:`, `docs:`, `chore:`.
-
-## Deployment Procedure
-Production project: `berita-auto`.
-Production branch: `feature/auto-news-mvp`.
-After code commits, verify Production target, branch, intended SHA/descendant, READY state, and alias `berita-auto.vercel.app`.
-Data-only worker commits are intentionally not UI deployments.
-
-## Environment Variables
-Names only, never values:
-- `OPENAI_API_KEY`
-- `OPENAI_MODEL`
-- `ADMIN_EMAILS`
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-- `AUTH_SECRET`
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
-
 ## Build and Test
-`npm ci`
-`npm run build`
-`npm run news:run`
-`npm run news:repair`
-Never claim build success without actual logs. The analytics import fix was deployed in Production build SHA `d058eec4574a02e4404e31474231b48f0722c931` and that deployment reached READY. The admin source distribution feature build for SHA `0c54e2c2a40d652a8715157c53fae236420243b7` also reached READY.
+Required commands:
+- `npm ci --prefer-offline --no-audit`
+- `npm run build`
+- `npm run news:run`
+- `npm run news:repair`
+
+Controlled AI tests should cover Gemini success, missing key, 429, timeout, invalid response, 5xx, optional OpenAI failover, and factual fallback without consuming production quota.
 
 ## DO NOT BREAK
-Google OAuth, `ADMIN_EMAILS`, Personal Notes, article IDs/fingerprints/slugs, canonical URLs, redirects, RSS dedupe, queue dedupe, one-at-a-time publisher, sitemap, robots, Google verification, advertising CTA, production branch, and non-force Git history.
-
-## Before Any AI Change
-Read this file and `/AGENTS.md`; fetch latest repository; confirm branch; inspect current architecture; implement minimally; run test/build; commit with Git Data API non-force; re-fetch source after commit; verify Production when requested; update this file when architecture changes.
+Google OAuth, `ADMIN_EMAILS`, Personal Notes, article IDs/fingerprints/slugs, canonical URLs, old redirects, RSS/pending dedupe, one-at-a-time publisher, sitemap, robots, Google verification, source distribution, source filtering, analytics, carousel, article full content, image behavior, production branch, and non-force Git history.
 
 ## Source of Truth
-Current repository wins over old conversation context.
+Current repository code wins over conversation history. Documentation must be updated when architecture changes.
 
 ## Current Implementation Status
-✅ queue-first 24/48 ingestion
+✅ multi-source RSS ingestion and queue
 ✅ queue target 60 / low watermark 30 / max 120
 ✅ one publication per worker run
-✅ 30 official RSS sources
-✅ international coverage
-✅ contextual 12-category classifier
-✅ article detail/full body renderer
-✅ dense homepage + carousel
-✅ semantic sitemap
-✅ ads retained
-✅ analytics import routes build correctly
-✅ package-lock permanently synced
-✅ `npm ci` proven successful in scheduler run #19
-✅ queue + published data persisted by scheduler run #19
-✅ final scheduler contains cron + workflow_dispatch and no per-run lock regeneration
-✅ non-force Git Data procedure documented
-✅ Vercel Production READY for analytics-fixed application code
-✅ admin source distribution code added from real published `sourceName` data
-✅ admin source filter integrated with existing query-state and category filter, including unknown-source fallback
-✅ Vercel Production READY for source-distribution feature SHA `0c54e2c2a40d652a8715157c53fae236420243b7`
-⚠️ exact all-time source count table was not independently extracted through the available repository/admin connectors in this verification turn; no source counts are being fabricated in the report
-⚠️ live OpenAI paraphrase/repair not verified because credential availability is not exposed by the available connector and prior worker execution used factual fallback
-⚠️ real views/geo/popular remain inactive until Upstash Redis environment variables are configured
-⚠️ three successive five-minute publication gaps have not been empirically verified
-⚠️ admin visual/dashboard state behind the existing Google session was not directly viewable in the verification tool; the deployed route is HTTP 200 and remains protected by the existing login gate
+✅ existing category/source distribution and source filtering
+✅ recent-50 source distribution and domination warning
+✅ Gemini-first article generation code
+✅ optional OpenAI secondary path
+✅ factual non-AI fallback
+✅ generation metadata on new publications
+✅ historical repair refuses fallback overwrite
+✅ redesigned `BERITA HARI INI` homepage intro
+✅ reusable responsive AdSlot redesign
+✅ public ad phone number removed from AdSlot markup
+✅ reduced-motion rules for new intro/ad styles
+⚠️ live Gemini generation requires `GEMINI_API_KEY` to be configured in GitHub Actions; connector cannot prove secret existence
+⚠️ Gemini default model `gemini-2.5-flash-lite` is currently stable but Google lists shutdown on October 16, 2026; keep `GEMINI_MODEL` configurable and migrate before shutdown
+⚠️ no dedicated Admin News Pipeline component exists in the audited repository, so no mock provider panel was added
 
 ## Last Verified
-Application feature branch HEAD: `0c54e2c2a40d652a8715157c53fae236420243b7`.
-Scheduler HEAD: `4426070443c35f46a57ea372f997c2a0d4cf0398`.
-Latest READY Production deployment: `dpl_HxFgCdVfzE8GwrUf64N71Xa8oWVS` for SHA `0c54e2c2a40d652a8715157c53fae236420243b7`.
-Production alias: `https://berita-auto.vercel.app`.
+Feature branch HEAD: update after final commit.
+Main branch: update after scheduler env commit if changed.
+Production deployment: update after final READY deployment.
