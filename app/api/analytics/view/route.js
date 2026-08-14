@@ -1,6 +1,8 @@
 import {readArticles} from '../../../../lib/storage.js';
 import {recordView} from '../../../../lib/analytics.js';
 
+export const dynamic='force-dynamic';
+
 export async function POST(request){
   try{
     const body=await request.json();
