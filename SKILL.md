@@ -157,7 +157,7 @@ Do not claim a check passed without evidence.
 The active registry contains verified official publisher RSS/Atom endpoints. Publishers without a reliable or clearly usable official feed are skipped rather than replaced with third-party proxy feeds. International publishers may be added only after official feed/API and usage terms are verified.
 
 ## Security
-Never print or commit `CRON_SECRET`, Upstash tokens, QStash tokens, OAuth secrets, Gemini/OpenAI keys, or `.env` files. If a secret is found in repository history, treat it as a security issue without repeating its value. Any credential previously exposed in conversation must be rotated and must not be reused.
+Never print or commit `CRON_SECRET`, Upstash tokens, QStash tokens, OAuth secrets, Gemini/OpenAI keys, or `.env` files. If a secret is found in repository history, treat it as a security issue without repeating its value. Any credential previously exposed in conversation must be rotated and must not be reused. Production Gemini verification is blocked until the newly rotated credential is installed privately in Vercel.
 
 ## Definition of Done
 Multi-source ingestion, source isolation, cross-source dedupe, deterministic rotation, metadata separation, Redis persistence, build/tests, atomic commit, READY production deployment, runtime publication, multi-publisher production evidence, Admin Pipeline, scheduler evidence, Gemini primary success evidence, lazy AI generation, fallback availability, image validation, and required documentation must all be verified before declaring completion.
