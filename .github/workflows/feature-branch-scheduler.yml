@@ -31,6 +31,9 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Validate worker syntax
+        run: node --check worker/run.js
+
       - name: Decide scheduler role
         id: gate
         shell: bash
@@ -44,16 +47,15 @@ jobs:
           elif [[ "$EVENT_SCHEDULE" == "2-59/5 * * * *" ]]; then
             role="primary"
             should_run="true"
+            echo "role=$role" >> "$GITHUB_OUTPUT"
+            echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
           else
             role="watchdog"
             should_run="false"
             node <<'NODE'
             const fs=require('node:fs');
             const path=require('node:path');
-            const read=(name, fallback)=>{
-              try{return JSON.parse(fs.readFileSync(path.join(process.cwd(),name),'utf8'));}
-              catch{return fallback;}
-            };
+            const read=(name,fallback)=>{try{return JSON.parse(fs.readFileSync(path.join(process.cwd(),name),'utf8'));}catch{return fallback;}};
             const articles=read('data/articles.json',[]);
             const pending=read('data/pending-articles.json',[]);
             const last=articles[0];
@@ -62,10 +64,10 @@ jobs:
             const recover=pending.length>0&&gapMinutes>10;
             console.log(`[watchdog] latest=${last?.title||'none'}`);
             console.log(`[watchdog] pending=${pending.length} gap-minutes=${Number.isFinite(gapMinutes)?gapMinutes.toFixed(2):'n/a'} recovery=${recover}`);
-            fs.writeFileSync(process.env.GITHUB_OUTPUT||'/tmp/no-output',`should_run=${recover}\nrole=watchdog\n`);
+            fs.writeFileSync(process.env.GITHUB_OUTPUT,`role=watchdog\nshould_run=${recover}\n`,{encoding:'utf8'});
             NODE
           fi
-          if [[ "$role" != "watchdog" ]]; then
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             echo "role=$role" >> "$GITHUB_OUTPUT"
             echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
           fi
