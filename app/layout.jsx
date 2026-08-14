@@ -1,5 +1,6 @@
 import './globals.css';
 import '../components/ads.css';
+import './timestamp.css';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Analytics } from '@vercel/analytics/next';
 const siteUrl='https://berita-auto.vercel.app';

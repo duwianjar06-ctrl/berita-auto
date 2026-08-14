@@ -1,1 +1,1 @@
-export default function robots(){const base='https://berita-auto.vercel.app';return {rules:{userAgent:'*',allow:'/'},sitemap:`${base}/sitemap.xml`}}
+const base='https://berita-auto.vercel.app';export default function robots(){return {rules:[{userAgent:'*',allow:'/',disallow:['/admin-berita','/api/','/auth/','/preview']}],sitemap:[`${base}/sitemap.xml`,`${base}/news-sitemap.xml`],host:base}}
