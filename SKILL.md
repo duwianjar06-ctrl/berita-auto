@@ -39,7 +39,7 @@ Production cron target on `main`: `2-59/5 * * * *`.
 
 ## Queue and Publication
 
-`data/pending-articles.json` stores candidate metadata only. Pending is not part of public article reads, category pages, homepage, popular views, or sitemap.
+`data/pending-articles.json` stores candidate metadata only. Pending is not part of public article reads, category pages, homepage, analytics, or sitemap.
 
 When pending <30, intake targets 48 new candidates. When pending is 30-59, intake targets 24. When pending >=60, normal refill is skipped unless breaking/fresh logic is added safely. Queue never exceeds 120. Candidates older than 12h are normally expired.
 
@@ -67,7 +67,7 @@ The prompt requires genuine paraphrase, changed sentence/paragraph structure, no
 
 ### AI Credential Status
 
-The runtime test environment currently has `OPENAI_API_KEY` empty. Therefore the successful worker test proved source-material fallback and queue/publication behavior, but did **not** prove a live OpenAI paraphrase call.
+The available GitHub Actions test environment currently exposes an empty `OPENAI_API_KEY`. Therefore the queue/publisher/runtime tests prove ingestion, selection, source-material fallback, image enrichment, and persistence mechanics, but they do **not** prove a live OpenAI paraphrase call.
 
 Do not add fake credentials. GitHub Actions must use `secrets.OPENAI_API_KEY` when configured.
 
@@ -77,17 +77,19 @@ Do not add fake credentials. GitHub Actions must use `secrets.OPENAI_API_KEY` wh
 
 Command: `npm run news:repair`.
 
-Because the current Actions test environment lacks an OpenAI credential, existing historical truncated articles remain a documented maintenance blocker rather than being fabricated or copied.
+Historical articles that still contain source-summary ellipses remain a maintenance issue until a real AI credential is available; they are not fabricated or silently copied.
 
 ## Article Detail
 
-`app/berita/[slug]/page.jsx` renders all `article.content` paragraphs. The article body has no `slice`, `substring`, line-clamp, max-height cutoff, or overflow hiding. It separates source publication time from Berita Auto publication time and adds related articles, share links, source attribution, article ads, sidebar, and NewsArticle JSON-LD.
+`app/berita/[slug]/page.jsx` renders all `article.content` paragraphs. The article body has no `slice`, `substring`, line-clamp, max-height cutoff, or overflow hiding. It separates source publication time from Berita Auto publication time and adds related articles, sharing, source attribution, article ads, sidebar, optional real popular ranking, and NewsArticle JSON-LD.
 
-`lib/text.js` removes only terminal ellipsis artifacts from summaries/excerpts; it does not invent missing body text.
+`lib/text.js` removes terminal ellipsis artifacts from summaries/excerpts without inventing missing body text.
+
+`components/ArticleViewTracker.jsx` sends one asynchronous view event per article/session to `/api/analytics/view` when the analytics backend is configured.
 
 ## Homepage
 
-`app/home/page.jsx` contains a dense newsroom layout: breaking/latest bar, top ad, hero, side cards, carousel, compact horizontal cards, category sections, additional categories, and footer advertising.
+`app/home/page.jsx` contains a dense newsroom layout: breaking/latest bar, top ad, hero, side cards, carousel, compact horizontal cards, optional real popular section, category sections, additional categories, and footer advertising.
 
 `components/StoryCarousel.jsx` uses lightweight native horizontal scrolling, responsive card widths, keyboard focus, prev/next controls, and mobile swipe. No heavy carousel library is used.
 
@@ -97,15 +99,36 @@ Reusable `components/AdSlot.jsx` with leaderboard, rectangle, in-article, sideba
 
 ## Analytics
 
-Real views/popular/geo analytics are **not active**. Current project dependencies/configuration do not provide a persistent writable analytics datastore accessible to both public article requests and `/admin-berita`.
+Real analytics plumbing is implemented but intentionally optional.
 
-Do not fake counts. Do not write every pageview to Git. Do not store raw visitor IP permanently. Required unblocker: persistent analytics storage plus a server-side read/write/query interface. Once provided, implement async view events, simple bot filtering, aggregate country/region/city, popular windows, and admin filters without changing auth or personal notes.
+Public event route: `app/api/analytics/view/route.js`.
+
+Adapter: `lib/analytics.js`.
+
+Tracker: `components/ArticleViewTracker.jsx`.
+
+Admin endpoint: `app/api/admin/analytics/route.js`.
+
+Persistence backend: Upstash Redis REST, activated only when both variables below exist:
+
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
+
+The adapter uses durable Redis sorted sets and aggregates. It does not store raw full IP addresses. It uses Vercel's geolocation headers for country, region, and city. Vercel documents these headers as `x-vercel-ip-country`, `x-vercel-ip-country-region`, and `x-vercel-ip-city`. citeturn550525search0turn550525search1
+
+Bot filtering ignores common crawler/bot/headless/monitor user agents. A per-article five-minute cookie cooldown plus sessionStorage reduces duplicate view events.
+
+Popular windows support today/7-day/30-day aggregation using daily Redis sorted sets. Admin filtering supports date window, category, source, country, region, city, minimum/maximum views, and sort.
+
+When Redis variables are absent, tracking no-ops and admin explicitly shows the analytics blocker. No fake view numbers are rendered and no pageview is committed to Git.
+
+Required production unblocker: create/configure a persistent Redis store and set the two environment variables. Upstash's serverless Redis supports durable REST access and pipelines suitable for Vercel functions. citeturn903108search1turn903108search4
 
 ## Admin
 
 Route: `/admin-berita`. Auth remains Google OAuth via `auth.js`, restricted by `ADMIN_EMAILS`. Personal Notes remains `components/admin/AdminNotes.jsx`.
 
-Current admin shows content/category/automation/activity. Views and geo filters are intentionally absent until real analytics persistence exists.
+When Redis analytics is configured, admin shows total views, today, 7-day/30-day views, top articles, top categories, countries, regions/cities, and filterable article rows with views. When it is not configured, the panel clearly shows the exact env names needed and does not display dummy counts.
 
 ## SEO and Sitemap
 
@@ -125,11 +148,13 @@ Preserve robots, Google verification, old redirects, and canonical behavior.
 
 ## Scheduler
 
-`main/.github/workflows/feature-branch-scheduler.yml` is the production scheduler. It checks out `feature/auto-news-mvp`, Node 22 + npm cache, uses `npm ci --prefer-offline --no-audit`, runs `npm run news:run`, stages both published and pending data, rebases onto current feature HEAD, and pushes without force.
+`main/.github/workflows/feature-branch-scheduler.yml` is the production scheduler. It checks out `feature/auto-news-mvp`, uses Node 22 + npm cache, runs `npm install --package-lock-only --ignore-scripts --no-audit` only to reconcile an out-of-sync lockfile, then performs the required clean `npm ci --prefer-offline --no-audit`, runs `npm run news:run`, stages `package-lock.json`, `data/articles.json`, and `data/pending-articles.json`, rebases onto the latest application branch, and pushes without force.
+
+The lockfile reconciliation exists because the repository previously had a stale lockfile that made `npm ci` fail with EUSAGE. Once the lock is synced, later runs should make the reconciliation a no-op.
 
 Concurrency: `auto-news`, `cancel-in-progress: false`.
 
-Default target is one article each approximately five minutes. No self-dispatch chain is used because the existing cron is the simpler mechanism. Historical cadence should be verified from actual run timestamps; do not invent a 5-minute empirical result.
+Default target is one article approximately every five minutes. No self-dispatch chain is used. The latest observed scheduled run after the first scheduler commit failed at the stale lockfile before the worker stage; the corrected scheduler commit is `850c53d23dc2d9b0a2dc63d7175df77badd18f31`. A fresh scheduled run on this corrected workflow is required to mark cadence/queue persistence empirically verified.
 
 ## Git Data API Procedure
 
@@ -167,6 +192,8 @@ Names only; never document values:
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `AUTH_SECRET`
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
 
 ## Build and Test
 
@@ -190,6 +217,10 @@ Google OAuth, `ADMIN_EMAILS`, Personal Notes, article IDs/fingerprints/slugs, ca
 
 Read this file completely, read `/AGENTS.md`, fetch latest repository, confirm branch, inspect current files, preserve behavior, implement minimally, run tests/build, commit with Git Data API non-force, re-fetch source after commit, verify Production if requested, and update this file when architecture changes.
 
+## Source of Truth
+
+The current repository wins over old conversation context.
+
 ## Current Implementation Status
 
 ✅ queue-first 24/48 ingestion
@@ -206,13 +237,14 @@ Read this file completely, read `/AGENTS.md`, fetch latest repository, confirm b
 ✅ non-force Git procedure documented
 ✅ SKILL.md and AGENTS.md
 ✅ Vercel data-only rebuild suppression observed
-⚠️ live OpenAI paraphrase not empirically verified because `OPENAI_API_KEY` is empty in the available Actions environment
-⚠️ existing historical truncated articles are not fully regenerated for the same credential reason
-⚠️ real reader view/geo analytics unavailable without a persistent analytics datastore
-⚠️ scheduler five-minute history from the new `main` workflow is not yet empirically verified by a run after the latest scheduler commit
+✅ optional real analytics adapter/tracker/admin API implemented without fake values
+⚠️ live OpenAI paraphrase not empirically verified because `OPENAI_API_KEY` is empty in available Actions environment
+⚠️ historical truncated articles are not fully regenerated for the same credential reason
+⚠️ real analytics will remain inactive until Upstash Redis env values are configured
+⚠️ the first scheduled run after the queue scheduler change failed on stale package-lock; corrected scheduler is now `850c53d23dc2d9b0a2dc63d7175df77badd18f31` and requires a fresh successful schedule run before claiming queue persistence/cadence live
 
 ## Last Verified
 
-Production READY deployment: `7e12ec32da41433692fdf9b36fb980909ab4cd22` at `berita-auto.vercel.app`.
+Latest known READY Production deployment before the analytics code commit: SHA `976d62a210f3fb0f34062033caf7861cead28564`.
 
-Application branch may advance by worker data commits without a Vercel UI rebuild; do not treat a data-only SHA as a code deployment.
+Do not write a newer Production SHA here until Vercel reports READY for the intended latest code commit.

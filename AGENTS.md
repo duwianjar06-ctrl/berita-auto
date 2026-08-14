@@ -1,16 +1,17 @@
 # Berita Auto Agent Instructions
 
 1. Read `/SKILL.md` completely before editing.
-2. Work from the latest repository state; old conversation context is not source of truth.
+2. Fetch the latest repository and confirm the target branch before every change.
 3. Application branch: `feature/auto-news-mvp`.
-4. Scheduler branch: `main`.
-5. Never force-push or force-update a ref.
-6. Re-fetch HEAD immediately before `update_ref`; rebuild the tree if HEAD changed.
-7. Preserve Google OAuth, `ADMIN_EMAILS`, Personal Notes, SEO/canonical URLs, RSS dedupe, queue dedupe, and one-at-a-time publishing.
-8. Run build/test where available and report real results.
-9. Update `/SKILL.md` whenever architecture changes.
+4. Scheduler/default branch: `main`.
+5. Production branch: `feature/auto-news-mvp`.
+6. Never force-push or force-update a ref.
+7. Re-fetch HEAD immediately before `update_ref`; rebuild the tree if HEAD changed.
+8. Preserve Google OAuth, `ADMIN_EMAILS`, Personal Notes, canonical URLs, old redirects, RSS/pending dedupe, one-at-a-time publishing, robots, sitemap, and advertising CTA.
+9. Run real build/test commands when possible and report exact failures.
 10. Never expose or commit secrets.
-11. Published data lives in `data/articles.json`; pending candidates live in `data/pending-articles.json`.
-12. Ingestion is separate from publication: at most one article is published per worker run.
-
-Full project architecture, Git Data API commit procedure, scheduler, queue, deployment, SEO, and known blockers are documented in `/SKILL.md`.
+11. Pending candidates live in `data/pending-articles.json`; published articles live in `data/articles.json`.
+12. Ingestion is separate from publication. A worker run publishes at most one article.
+13. Never fabricate reader views, geo data, quotations, reporters, interviews, facts, or credentials.
+14. Analytics code is optional and activates only when `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are configured.
+15. Read `/SKILL.md` for the exact Git Data API, scheduler, queue, analytics, deployment, and maintenance procedures.
