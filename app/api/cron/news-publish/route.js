@@ -2,6 +2,7 @@ import {NextResponse} from 'next/server';
 import {runPublicationCycle} from '../../../../worker/run.js';
 
 export const dynamic='force-dynamic';
+export const runtime='nodejs';
 
 function authorized(request){
   const secret=process.env.CRON_SECRET||'';
