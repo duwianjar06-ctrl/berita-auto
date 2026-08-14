@@ -16,7 +16,7 @@ concurrency:
 jobs:
   generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 6
     steps:
       - name: Checkout application branch
         uses: actions/checkout@v4
@@ -40,6 +40,8 @@ jobs:
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Configure git
         run: |
