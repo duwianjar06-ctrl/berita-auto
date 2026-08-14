@@ -89,6 +89,18 @@ The adapter uses durable Redis structures, aggregate country/region/city data fr
 ## Admin
 `/admin-berita` remains protected by existing Google OAuth and `ADMIN_EMAILS`. Personal Notes remains `components/admin/AdminNotes.jsx`. Analytics controls are shown only when the real persistence backend is configured.
 
+### Admin Distribution Dashboard
+The `DISTRIBUSI` area keeps the existing `Distribusi Kategori` section first and adds `Distribusi Sumber Berita` directly below it.
+
+Source distribution is derived from the published article array returned by `readArticles()`, using actual `article.sourceName`. Pending candidates are never included. Articles missing `sourceName` are grouped as `Sumber tidak diketahui` so the distribution still reconciles to the published article total without inventing metadata.
+
+Implementation helper: `lib/admin-source-distribution.js`.
+It performs one pass over the published articles and returns source count, contribution percentage, latest publication timestamp, and dominant category. Default order is descending article count, then latest publication, then source name.
+
+The dashboard shows Total Sumber, Total Berita, Sumber Terbesar, Dominasi, per-source count/percentage/progress bar, a >50% dominance warning, inline `Lihat Semua Sumber` detail table, and `Distribusi 50 Berita Terbaru` as a secondary diversity check. Source rows are links using the existing admin URL/query-state pattern (`source=...`) and preserve category/query state. The existing article pagination/filter list now applies `source` together with category and search filters.
+
+Source distribution is distinct from Source Monitor semantics: distribution measures published articles by `sourceName`; Source Monitor measures RSS/source health and fetching state. No source counts are hardcoded, mocked, randomised, or derived from analytics views.
+
 ## SEO and Sitemap
 Article metadata includes title, description, canonical, OpenGraph, Twitter, NewsArticle JSON-LD, datePublished/dateModified, publisher/author as Berita Auto, and mainEntityOfPage.
 `app/sitemap.js` includes homepage, all 12 categories, and published canonical articles only. lastmod is semantic, based on actual content timestamps. Pending/admin/auth/API/private routes are excluded.
@@ -191,12 +203,15 @@ Current repository wins over old conversation context.
 ✅ final scheduler contains cron + workflow_dispatch and no per-run lock regeneration
 ✅ non-force Git Data procedure documented
 ✅ Vercel Production READY for application code commit `d058eec4574a02e4404e31474231b48f0722c931`
+✅ admin source distribution code added from real published `sourceName` data
+✅ admin source filter integrated with existing query-state and category filter
 ⚠️ live OpenAI paraphrase/repair not verified because credential availability is not exposed by the available connector and prior worker execution used factual fallback
 ⚠️ real views/geo/popular remain inactive until Upstash Redis environment variables are configured
 ⚠️ three successive five-minute publication gaps have not been empirically verified
+⚠️ final Vercel deployment for the new admin distribution feature must reach READY before visual production verification can be claimed
 
 ## Last Verified
-Application HEAD: `21f09f10975a4173357da78e78c18620aff50053`
-Scheduler HEAD: `4426070443c35f46a57ea372f997c2a0d4cf0398`
-Latest READY Production code deployment: `d058eec4574a02e4404e31474231b48f0722c931`
-Latest application HEAD is a descendant containing data-only worker changes after the READY code deployment; this is intentional and does not require another UI rebuild.
+Application feature branch HEAD before the documentation commit: `ed3ecf326dfd374b1370d7c6e13c80201c9a359f`.
+Scheduler HEAD: `4426070443c35f46a57ea372f997c2a0d4cf0398`.
+Latest READY Production code deployment before this feature: `d058eec4574a02e4404e31474231b48f0722c931`.
+The source-distribution feature is a code change and therefore requires a fresh Production deployment.
