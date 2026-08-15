@@ -31,6 +31,9 @@ assert.equal(first.category,'Otomotif','selection must rank only available valid
 const after=[first,...published];
 const second=selectPublication(candidates.filter(x=>x.fingerprint!==first.fingerprint),after,now);
 assert.equal(second.category,'Sains','second slot should move to next available deficit category');
+const repeated=[...candidates,{fingerprint:'candidate-oto-2',title:'Otomotif candidate 2',summary:'mobil motor kendaraan',category:'Otomotif',publishedAt:new Date(now-60000).toISOString(),sourceWeight:1,imageUrl:'https://example.com/image.jpg'}];
+const reservedSecond=selectPublication(repeated,published,now,['Otomotif']);
+assert.equal(reservedSecond.category,'Sains','reserved first deficit category must yield the next deficit category for slot two');
 
 assert.equal(classifyCategory({title:'Perusahaan startup merilis aplikasi software baru untuk smartphone',summary:'platform teknologi dan cyber security'}),'Teknologi');
 assert.equal(classifyCategory({title:'Riset astronomi menemukan objek baru',summary:'penelitian ilmiah tentang biologi'}),'Sains');
