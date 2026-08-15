@@ -1,0 +1,27 @@
+name: Social Publishing CI
+
+on:
+  push:
+    branches:
+      - feature/auto-news-mvp
+  pull_request:
+    branches:
+      - feature/auto-news-mvp
+
+permissions: {}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:social
+      - run: npm run test:article-routing
+      - run: npm run test:category-balance
+      - run: npm run build
