@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import {selectPublication} from './strategy.js';
 import {categoryDistribution,shouldDeprioritizeNational} from './category-balance.js';
 import {categories} from '../lib/categories.js';
+import {classifyCategory} from './category.js';
+import {isValidImageUrl} from './image-enrichment.js';
 
 const now=Date.parse('2026-08-15T12:00:00Z');
 const categoriesUnderTest=['Nasional','Ekonomi','Teknologi','Sains','Otomotif'];
@@ -29,4 +31,12 @@ assert.equal(first.category,'Otomotif','selection must rank only available valid
 const after=[first,...published];
 const second=selectPublication(candidates.filter(x=>x.fingerprint!==first.fingerprint),after,now);
 assert.equal(second.category,'Sains','second slot should move to next available deficit category');
-console.log('category balance regression: PASS priority=Otomotif,Sains denominator=875 categories=12 nationalPenalty=active');
+
+assert.equal(classifyCategory({title:'Perusahaan startup merilis aplikasi software baru untuk smartphone',summary:'platform teknologi dan cyber security'}),'Teknologi');
+assert.equal(classifyCategory({title:'Riset astronomi menemukan objek baru',summary:'penelitian ilmiah tentang biologi'}),'Sains');
+assert.equal(classifyCategory({title:'Mobil listrik baru diluncurkan',summary:'kendaraan EV untuk pasar Indonesia'}),'Otomotif');
+assert.equal(classifyCategory({title:'Film terbaru dibintangi aktor ternama',summary:'konser musik dan penyanyi'}),'Hiburan');
+assert.equal(classifyCategory({title:'DPR membahas rancangan undang-undang',summary:'partai politik dan pemilu'}),'Politik');
+assert.equal(isValidImageUrl('not-a-url'),false,'invalid image must fail image gate');
+
+console.log('category balance regression: PASS priority=Otomotif,Sains denominator=875 categories=12 nationalPenalty=active truthful-classification=image-gate');
