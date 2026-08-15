@@ -14,7 +14,7 @@ import './intro.css';
 export const dynamic='force-dynamic';
 const FOREIGN_SOURCE_IDS=new Set(NEWS_SOURCES.filter(source=>{const text=String(source.language||'')+' '+String(source.category||'')+' '+String(source.id||'')+' '+String(source.publisher||'')+' '+String(source.name||'');return (source.language&&source.language.toLowerCase()!=='id')||/internasional|international|techcrunch|verge|deutsche|nasa|noaa/i.test(text)}).map(source=>source.id));
 function byCategory(items,name){return items.filter(a=>(a.category||'').toLowerCase()===name.toLowerCase());}
-function publicArticle(a){const language=String(a.language||'id').toLowerCase();const status=String(a.translationStatus||'translated').toLowerCase();const sourceId=String(a.sourceId||'');return status==='translated'||(language==='id'&&!FOREIGN_SOURCE_IDS.has(sourceId));}
+function publicArticle(a){const language=String(a.language||'id').toLowerCase();const status=String(a.translationStatus||'translated').toLowerCase();const sourceId=String(a.sourceId||'');return language==='id'&&status!=='pending'&&!FOREIGN_SOURCE_IDS.has(sourceId);}
 export default async function EditorialHome(){
  const articles=await readArticles();
  const visible=articles.filter(publicArticle);
