@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {articlePath,articleSlug,stableIdFromArticlePath,matchesArticleStableId} from '../lib/article-url.js';
 import {isLegacyArticlePath,legacyIdFromPath,findLegacyArticleInMemory} from '../lib/legacy-route.js';
+import {mergeDurableArticles} from '../lib/storage.js';
 
 const article={id:'1234567890abcdef',fingerprint:'1234567890abcdef',slug:'judul-baru',title:'Judul Baru'};
 const oldPath='/berita/judul-lama-12345678';
@@ -20,4 +21,13 @@ assert.equal(findLegacyArticleInMemory([legacyArticle],'8b5f1575540d8257a5e4adaf
 assert.equal(findLegacyArticleInMemory([legacyArticle],'deadbeefdeadbeefdeadbeef'),null);
 assert.equal(isLegacyArticlePath('/berita/judul-baru-12345678'),false);
 
-console.log('article route regression: PASS stable-id + legacy resolver');
+const archive=[{id:'old',fingerprint:'old',title:'old',category:'Nasional'},{id:'new',fingerprint:'new',title:'new',category:'Teknologi'}];
+const merged=mergeDurableArticles(archive,[{id:'new',fingerprint:'new',title:'new updated',category:'Sains'}]);
+assert.equal(merged.length,2,'bounded incoming writes must not delete older published archive records');
+assert.equal(merged.find(x=>x.id==='old')?.title,'old');
+assert.equal(merged.find(x=>x.id==='new')?.category,'Sains');
+const feedLimited=archive.slice(0,1);
+assert.equal(mergeDurableArticles(archive,feedLimited).length,2,'feed/pagination limits must not mutate durable archive');
+assert.equal(mergeDurableArticles(archive,[{id:'new',fingerprint:'new',category:'Sains'}]).find(x=>x.id==='new')?.fingerprint,'new','stable ID must be preserved during reclassification');
+
+console.log('article route regression: PASS stable-id + legacy resolver + durable archive');
