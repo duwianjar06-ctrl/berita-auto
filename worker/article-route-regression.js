@@ -31,6 +31,7 @@ assert.equal(mergeDurableArticles(archive,feedLimited).length,2,'feed/pagination
 assert.equal(mergeDurableArticles(archive,[{id:'new',fingerprint:'new',category:'Sains'}]).find(x=>x.id==='new')?.fingerprint,'new','stable ID must be preserved during reclassification');
 const historical=await readHistoricalRecovery();
 assert.equal(historical.some(x=>x.id==='19382b3f6009f836a9dc3b1a'),true,'historical recovery manifest must retain authoritative stable ID');
-assert.equal(historical.find(x=>x.id==='19382b3f6009f836a9dc3b1a')?.category,'Nasional');
+assert.equal(historical.some(x=>x.id==='8b5f1575540d8257a5e4adaf'),true,'historical recovery manifest must retain known legacy ID');
+assert.equal(historical.find(x=>x.id==='8b5f1575540d8257a5e4adaf')?.category,'Nasional');
 
 console.log('article route regression: PASS stable-id + legacy resolver + durable archive + historical recovery');
