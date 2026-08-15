@@ -1,0 +1,35 @@
+name: Sync package lock
+
+on:
+  push:
+    branches:
+      - feature/auto-news-mvp
+    paths:
+      - package.json
+      - package-lock.json
+
+permissions:
+  contents: write
+
+jobs:
+  sync-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feature/auto-news-mvp
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+      - run: npm install --package-lock-only --ignore-scripts
+      - name: Commit generated lockfile
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo 'package-lock.json already synchronized'
+            exit 0
+          fi
+          git config user.name 'projectdaaw-bot'
+          git config user.email 'projectdaaw-bot@users.noreply.github.com'
+          git add package-lock.json
+          git commit -m 'chore: sync security dependency lock'
+          git push origin HEAD:feature/auto-news-mvp
