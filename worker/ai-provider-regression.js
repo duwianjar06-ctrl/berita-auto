@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import {getProviderRegistry,resetAIUsageStats,getAIUsageStats} from '../lib/ai-providers.js';
+
+const originalFetch=globalThis.fetch;
+const originalKey=process.env.GEMINI_API_KEY;
+process.env.GEMINI_API_KEY='test-key';
+let calls=0;
+const validBody={candidates:[{content:{parts:[{text:JSON.stringify({title:'Judul uji',excerpt:'Ringkasan uji yang cukup panjang untuk validasi.',content:'Paragraf uji pertama yang berisi fakta material dari bahan sumber dan memiliki panjang yang memadai untuk validator.',language:'id'})}]}}]};
+globalThis.fetch=async()=>{calls++;return new Response(JSON.stringify(validBody),{status:200,headers:{'content-type':'application/json'}})};
+try{
+  resetAIUsageStats();
+  const registry=getProviderRegistry({
+    buildPrompt:()=> 'test',
+    parseJsonText:value=>JSON.parse(value),
+    validateOutput:value=>value,
+    requestWithTimeout:async()=>new Response('{}',{status:500})
+  });
+  const item={fingerprint:'ai-cache-regression-unique',title:'Judul sumber',publishedAt:'2026-08-15T12:00:00Z'};
+  const material='Fakta sumber yang cukup untuk pengujian cache.';
+  const first=await registry[0].generate(item,material);
+  const second=await registry[0].generate(item,material);
+  assert.equal(first.generationProvider,'gemini');
+  assert.equal(second.generationProvider,'gemini');
+  assert.equal(calls,1,'duplicate identical AI input must use cache');
+  assert.equal(getAIUsageStats().cacheHits,1);
+
+  calls=0;
+  globalThis.fetch=async()=>{calls++;return new Response(JSON.stringify({error:{message:'quota exceeded'}}),{status:429,headers:{'content-type':'application/json'}})};
+  await assert.rejects(()=>registry[0].generate({fingerprint:'ai-429-regression-unique',title:'429',publishedAt:'2026-08-15T12:01:00Z'},material),/gemini_http_429/);
+  assert.equal(calls,1,'429 quota must not be retried inside the worker cycle');
+  assert.equal(getAIUsageStats().rateLimited,1);
+  console.log('AI provider regression: PASS cache=1 429Requests=1');
+}finally{
+  globalThis.fetch=originalFetch;
+  if(originalKey===undefined)delete process.env.GEMINI_API_KEY;else process.env.GEMINI_API_KEY=originalKey;
+}
