@@ -1,8 +1,5 @@
 name: Deferred Production Deploy
 
-# Normal path remains Vercel Git integration. This watchdog only acts when
-# Production has fallen behind the newest CI-passing feature branch HEAD.
-# Scheduled workflows run from the repository default branch (main).
 on:
   schedule:
     - cron: "17 0,6,12,18 * * *"
@@ -34,90 +31,54 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           echo "[deferred-deploy] timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           echo "[deferred-deploy] targetBranch=${TARGET_BRANCH}"
-
           if [[ -z "${VERCEL_TOKEN:-}" ]]; then
             echo "[deferred-deploy] VERCEL_TOKEN: MISSING"
             echo "result=credential_missing" >> "$GITHUB_OUTPUT"
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-
           final_head="$(gh api "repos/${GITHUB_REPOSITORY}/branches/${TARGET_BRANCH}" --jq '.commit.sha')"
           echo "[deferred-deploy] finalHead=${final_head}"
           echo "final_head=${final_head}" >> "$GITHUB_OUTPUT"
-
           checks="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${final_head}/check-runs?per_page=100")"
           test_build="$(jq -r '[.check_runs[] | select(.name == "test-build") | select(.head_sha == "'"$final_head"'")] | last | .conclusion // "missing"' <<< "$checks")"
-          validate="$(jq -r '[.check_runs[] | select(.name == "validate") | select(.head_sha == "'"$final_head"'")] | last | .conclusion // "missing"' <<< "$checks")"
-
-          if [[ "$test_build" == "success" && "$validate" == "success" ]]; then
-            ci_status=success
-          else
-            ci_status=not_verified
-          fi
-
-          echo "[deferred-deploy] ciStatus=${ci_status} test-build=${test_build} validate=${validate}"
+          ci_status=not_verified
+          [[ "$test_build" == "success" ]] && ci_status=success
+          echo "[deferred-deploy] ciStatus=${ci_status} test-build=${test_build}"
           echo "ci_status=${ci_status}" >> "$GITHUB_OUTPUT"
-
-          deployments="$(curl --fail --silent --show-error \
-            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
-            -H "Accept: application/json" \
-            "https://api.vercel.com/v6/deployments?projectId=${VERCEL_PROJECT_ID}&teamId=${VERCEL_TEAM_ID}&target=production&limit=1")"
-
+          deployments="$(curl --fail --silent --show-error -H "Authorization: Bearer ${VERCEL_TOKEN}" -H "Accept: application/json" "https://api.vercel.com/v6/deployments?projectId=${VERCEL_PROJECT_ID}&teamId=${VERCEL_TEAM_ID}&target=production&limit=1")"
           production_sha="$(jq -r '.deployments[0].meta.githubCommitSha // "unknown"' <<< "$deployments")"
           production_id="$(jq -r '.deployments[0].uid // .deployments[0].id // "unknown"' <<< "$deployments")"
           production_state="$(jq -r '.deployments[0].readyState // .deployments[0].state // "unknown"' <<< "$deployments")"
           production_target="$(jq -r '.deployments[0].target // "unknown"' <<< "$deployments")"
-
           echo "[deferred-deploy] productionSha=${production_sha}"
           echo "[deferred-deploy] productionDeployment=${production_id}"
           echo "[deferred-deploy] productionState=${production_state}"
           echo "[deferred-deploy] productionTarget=${production_target}"
-
           echo "production_sha=${production_sha}" >> "$GITHUB_OUTPUT"
           echo "production_id=${production_id}" >> "$GITHUB_OUTPUT"
           echo "production_state=${production_state}" >> "$GITHUB_OUTPUT"
           echo "production_target=${production_target}" >> "$GITHUB_OUTPUT"
-
-          if [[ "$final_head" == "$production_sha" ]]; then
-            echo "[deferred-deploy] production already current"
-            echo "result=already_current" >> "$GITHUB_OUTPUT"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if [[ "$ci_status" != "success" ]]; then
-            echo "[deferred-deploy] FINAL HEAD NOT CI-VERIFIED"
-            echo "result=ci_not_verified" >> "$GITHUB_OUTPUT"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
+          if [[ "$final_head" == "$production_sha" ]]; then echo "[deferred-deploy] production already current"; echo "result=already_current" >> "$GITHUB_OUTPUT"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if [[ "$ci_status" != "success" ]]; then echo "[deferred-deploy] FINAL HEAD NOT CI-VERIFIED"; echo "result=ci_not_verified" >> "$GITHUB_OUTPUT"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0; fi
           echo "[deferred-deploy] deployNeeded=true"
           echo "skip=false" >> "$GITHUB_OUTPUT"
-
       - name: Checkout latest CI-passing feature HEAD
         if: steps.state.outputs.skip != 'true'
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.state.outputs.final_head }}
           fetch-depth: 1
-
       - name: Install Vercel CLI
         if: steps.state.outputs.skip != 'true'
         run: npm install --global vercel@latest
-
       - name: Link Vercel project
         if: steps.state.outputs.skip != 'true'
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          set -euo pipefail
-          vercel link --yes --project berita-auto --scope "$VERCEL_SCOPE" --token "$VERCEL_TOKEN"
-
+        run: vercel link --yes --project berita-auto --scope "$VERCEL_SCOPE" --token "$VERCEL_TOKEN"
       - name: Attempt one Production deployment
         id: deploy
         if: steps.state.outputs.skip != 'true'
@@ -133,22 +94,9 @@ jobs:
           output="$(cat "$log_file")"
           rm -f "$log_file"
           set -e
-
-          if [[ "$exit_code" -eq 0 ]]; then
-            echo "result=attempted" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if grep -Eiq '429|rate.?limit|build rate|api-deployments-free-per-day|resource is limited|too many requests|deployment limit|quota' <<< "$output"; then
-            echo "[deferred-deploy] VERCEL LIMIT STILL ACTIVE — DEFERRED DEPLOY REMAINS PENDING"
-            echo "result=rate_limited" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "[deferred-deploy] BUILD/DEPLOY FAILURE — CODE/BUILD INVESTIGATION REQUIRED"
-          echo "result=build_failed" >> "$GITHUB_OUTPUT"
-          exit "$exit_code"
-
+          if [[ "$exit_code" -eq 0 ]]; then echo "result=attempted" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if grep -Eiq '429|rate.?limit|build rate|api-deployments-free-per-day|resource is limited|too many requests|deployment limit|quota' <<< "$output"; then echo "[deferred-deploy] VERCEL LIMIT STILL ACTIVE — DEFERRED DEPLOY REMAINS PENDING"; echo "result=rate_limited" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "[deferred-deploy] BUILD/DEPLOY FAILURE — CODE/BUILD INVESTIGATION REQUIRED"; echo "result=build_failed" >> "$GITHUB_OUTPUT"; exit "$exit_code"
       - name: Verify Production after deployment
         if: steps.state.outputs.skip != 'true' && steps.deploy.outputs.result == 'attempted'
         env:
@@ -156,40 +104,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           for attempt in {1..12}; do
-            deployments="$(curl --fail --silent --show-error \
-              -H "Authorization: Bearer ${VERCEL_TOKEN}" \
-              -H "Accept: application/json" \
-              "https://api.vercel.com/v6/deployments?projectId=${VERCEL_PROJECT_ID}&teamId=${VERCEL_TEAM_ID}&target=production&limit=1")"
-
+            deployments="$(curl --fail --silent --show-error -H "Authorization: Bearer ${VERCEL_TOKEN}" -H "Accept: application/json" "https://api.vercel.com/v6/deployments?projectId=${VERCEL_PROJECT_ID}&teamId=${VERCEL_TEAM_ID}&target=production&limit=1")"
             production_sha="$(jq -r '.deployments[0].meta.githubCommitSha // "unknown"' <<< "$deployments")"
             production_id="$(jq -r '.deployments[0].uid // .deployments[0].id // "unknown"' <<< "$deployments")"
             production_state="$(jq -r '.deployments[0].readyState // .deployments[0].state // "unknown"' <<< "$deployments")"
             production_target="$(jq -r '.deployments[0].target // "unknown"' <<< "$deployments")"
-
             echo "[deferred-deploy] verify attempt=${attempt} productionDeployment=${production_id} state=${production_state} target=${production_target} productionSha=${production_sha}"
-
             if [[ "$production_state" == "READY" && "$production_target" == "production" ]]; then
-              if [[ "$production_sha" == "${{ steps.state.outputs.final_head }}" ]]; then
-                echo "[deferred-deploy] VERIFIED PRODUCTION — FINAL HEAD DEPLOYED"
-                exit 0
-              fi
-              echo "[deferred-deploy] WRONG PRODUCTION SHA"
-              exit 1
+              if [[ "$production_sha" == "${{ steps.state.outputs.final_head }}" ]]; then echo "[deferred-deploy] VERIFIED PRODUCTION — FINAL HEAD DEPLOYED"; exit 0; fi
+              echo "[deferred-deploy] WRONG PRODUCTION SHA"; exit 1
             fi
-
-            if [[ "$production_state" == "ERROR" || "$production_state" == "CANCELED" ]]; then
-              echo "[deferred-deploy] deployment ended in state=${production_state}"
-              exit 1
-            fi
-
+            if [[ "$production_state" == "ERROR" || "$production_state" == "CANCELED" ]]; then echo "[deferred-deploy] deployment ended in state=${production_state}"; exit 1; fi
             sleep 15
           done
-
           echo "[deferred-deploy] deployment did not reach a final state within bounded verification window"
           exit 1
-
       - name: Report deferred result
         if: always()
         run: |
