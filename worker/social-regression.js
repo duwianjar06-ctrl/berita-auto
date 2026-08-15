@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import {deterministicCaption,scoreSocialArticle,selectBestSocialArticle,titleSimilarity,socialConfig,dailyKey} from '../lib/social.js';
-import {classifyInstagramError} from '../lib/instagram.js';
+import {deterministicCaption,scoreSocialArticle,selectBestSocialArticle,titleSimilarity,socialConfig,dailyKey,shouldSkipCooldown,shouldSkipDailyLimit,shouldSkipMetaBuffer} from '../lib/social.js';
+import {classifyInstagramError,instagramConfig,instagramConfigured} from '../lib/instagram.js';
 const article={id:'a1',slug:'contoh-berita',title:'Pemerintah umumkan kebijakan baru hari ini',excerpt:'Ringkasan faktual mengenai kebijakan baru.',publisher:'ANTARA',category:'Nasional',sitePublishedAt:new Date().toISOString(),sourceWeight:5};
 assert.ok(deterministicCaption(article).includes('Baca selengkapnya: https://berita-auto.vercel.app/berita/contoh-berita'));
 assert.ok(scoreSocialArticle(article,{recentPublished:[]})>10);
@@ -10,5 +10,11 @@ const selected=selectBestSocialArticle([{article,state:'queued',articleId:'a1'}]
 assert.equal(classifyInstagramError(Object.assign(new Error('OAuthException'),{metaCode:190})).reason,'auth_token_invalid');
 assert.equal(classifyInstagramError(Object.assign(new Error('rate limit'),{status:429})).kind,'transient');
 assert.equal(classifyInstagramError(Object.assign(new Error('server error'),{status:503})).kind,'transient');
+assert.equal(classifyInstagramError(Object.assign(new Error('invalid image url'),{status:400})).reason,'invalid_media');
+assert.equal(shouldSkipCooldown('2026-08-15T12:00:00Z',Date.parse('2026-08-15T12:10:00Z'),20),true);assert.equal(shouldSkipCooldown('2026-08-15T12:00:00Z',Date.parse('2026-08-15T12:21:00Z'),20),false);
+assert.equal(shouldSkipDailyLimit(50,50),true);assert.equal(shouldSkipDailyLimit(49,50),false);
+assert.equal(shouldSkipMetaBuffer({available:true,remaining:10},10),true);assert.equal(shouldSkipMetaBuffer({available:true,remaining:11},10),false);
+process.env.INSTAGRAM_ENABLED='false';assert.equal(instagramConfig().enabled,false);assert.equal(instagramConfigured(),false);
+process.env.INSTAGRAM_ENABLED='true';delete process.env.INSTAGRAM_USER_ID;delete process.env.INSTAGRAM_ACCESS_TOKEN;assert.equal(instagramConfigured(),false);
 process.env.INSTAGRAM_MIN_INTERVAL_MINUTES='20';process.env.INSTAGRAM_MAX_POSTS_PER_DAY='50';process.env.INSTAGRAM_PUBLISHING_LIMIT_BUFFER='10';const cfg=socialConfig();assert.deepEqual(cfg,{minIntervalMinutes:20,maxPostsPerDay:50,limitBuffer:10});assert.match(dailyKey(Date.parse('2026-08-15T12:00:00Z')),/^ba:social:instagram:daily:2026-08-15$/);
 console.log('social regression: PASS');
