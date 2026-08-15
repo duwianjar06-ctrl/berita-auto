@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {deterministicCaption,scoreSocialArticle,selectBestSocialArticle,titleSimilarity,socialConfig,dailyKey} from '../lib/social.js';
 import {classifyInstagramError} from '../lib/instagram.js';
 const article={id:'a1',slug:'contoh-berita',title:'Pemerintah umumkan kebijakan baru hari ini',excerpt:'Ringkasan faktual mengenai kebijakan baru.',publisher:'ANTARA',category:'Nasional',sitePublishedAt:new Date().toISOString(),sourceWeight:5};
-assert.match(deterministicCaption(article),'Baca selengkapnya: https://berita-auto.vercel.app/berita/contoh-berita');
+assert.ok(deterministicCaption(article).includes('Baca selengkapnya: https://berita-auto.vercel.app/berita/contoh-berita'));
 assert.ok(scoreSocialArticle(article,{recentPublished:[]})>10);
 assert.equal(titleSimilarity('Pemerintah umumkan kebijakan baru','Pemerintah umumkan kebijakan baru'),1);
 assert.equal(selectBestSocialArticle([]),null);
