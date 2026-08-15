@@ -2,6 +2,7 @@ import './globals.css';
 import './article-hero.css';
 import './visual-fixes.css';
 import '../components/ads.css';
+import '../components/managed-ads.css';
 import './timestamp.css';
 import '../components/admin/workspace.css';
 import { SpeedInsights } from '@vercel/speed-insights/next';
