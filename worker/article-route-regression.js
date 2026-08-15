@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {articlePath,articleSlug,stableIdFromArticlePath,matchesArticleStableId} from '../lib/article-url.js';
 import {isLegacyArticlePath,legacyIdFromPath,findLegacyArticleInMemory} from '../lib/legacy-route.js';
-import {mergeDurableArticles} from '../lib/storage.js';
+import {mergeDurableArticles,readHistoricalRecovery} from '../lib/storage.js';
 
 const article={id:'1234567890abcdef',fingerprint:'1234567890abcdef',slug:'judul-baru',title:'Judul Baru'};
 const oldPath='/berita/judul-lama-12345678';
@@ -29,5 +29,8 @@ assert.equal(merged.find(x=>x.id==='new')?.category,'Sains');
 const feedLimited=archive.slice(0,1);
 assert.equal(mergeDurableArticles(archive,feedLimited).length,2,'feed/pagination limits must not mutate durable archive');
 assert.equal(mergeDurableArticles(archive,[{id:'new',fingerprint:'new',category:'Sains'}]).find(x=>x.id==='new')?.fingerprint,'new','stable ID must be preserved during reclassification');
+const historical=await readHistoricalRecovery();
+assert.equal(historical.some(x=>x.id==='19382b3f6009f836a9dc3b1a'),true,'historical recovery manifest must retain authoritative stable ID');
+assert.equal(historical.find(x=>x.id==='19382b3f6009f836a9dc3b1a')?.category,'Nasional');
 
-console.log('article route regression: PASS stable-id + legacy resolver + durable archive');
+console.log('article route regression: PASS stable-id + legacy resolver + durable archive + historical recovery');
