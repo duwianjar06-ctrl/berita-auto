@@ -1,1 +1,2 @@
+export const metadata={title:'Berita Auto - Berita Terkini Indonesia',description:'Portal berita terkini Indonesia yang diperbarui otomatis dari berbagai sumber publik terpercaya.',alternates:{canonical:'/'},openGraph:{type:'website',url:'https://berita-auto.vercel.app',siteName:'Berita Auto',locale:'id_ID',title:'Berita Auto - Berita Terkini Indonesia',description:'Portal berita terkini Indonesia yang diperbarui otomatis dari berbagai sumber publik terpercaya.'}};
 export {default} from './home/page.jsx';
