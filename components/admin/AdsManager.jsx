@@ -1,102 +1,23 @@
 'use client';
 
 import {useEffect,useMemo,useState} from 'react';
-import {AD_SLOTS,adAspectRatio} from '../../lib/ads.js';
+import {AD_SLOTS,adAspectRatio} from '../../lib/ads-core.js';
 
 const emptyForm={id:'',title:'',slot:'homepage_top',imageUrl:'',targetUrl:'',altText:'',isActive:true};
-
 function formatDate(value){if(!value)return '-';const d=new Date(value);return Number.isNaN(d.getTime())?'-':new Intl.DateTimeFormat('id-ID',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Jakarta'}).format(d)+' WIB'}
 function isExternal(url){try{return /^https?:$/.test(new URL(url).protocol)}catch{return false}}
 
 export default function AdsManager({initialAds=[]}){
-  const [ads,setAds]=useState(initialAds);
-  const [form,setForm]=useState(emptyForm);
-  const [file,setFile]=useState(null);
-  const [preview,setPreview]=useState('');
-  const [busy,setBusy]=useState(false);
-  const [message,setMessage]=useState('');
-  const [error,setError]=useState('');
-
+  const [ads,setAds]=useState(initialAds);const [form,setForm]=useState(emptyForm);const [file,setFile]=useState(null);const [preview,setPreview]=useState('');const [busy,setBusy]=useState(false);const [message,setMessage]=useState('');const [error,setError]=useState('');
   useEffect(()=>()=>{if(preview?.startsWith('blob:'))URL.revokeObjectURL(preview)},[preview]);
-  const slot=AD_SLOTS[form.slot];
-  const slots=useMemo(()=>Object.entries(AD_SLOTS),[]);
-
+  const slot=AD_SLOTS[form.slot];const slots=useMemo(()=>Object.entries(AD_SLOTS),[]);
   function reset(){setForm(emptyForm);setFile(null);setPreview('');setError('');setMessage('')}
   function edit(ad){setForm({...emptyForm,...ad});setFile(null);setPreview(ad.imageUrl||'');setError('');setMessage('')}
   function onFileChange(event){const selected=event.target.files?.[0]||null;if(!selected){setFile(null);setPreview(form.imageUrl||'');return}setFile(selected);setPreview(URL.createObjectURL(selected));setError('');setMessage('')}
+  async function uploadImage(){if(!file)return form.imageUrl;const data=new FormData();data.append('file',file);const response=await fetch('/api/admin/ads/upload',{method:'POST',body:data});const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||'Upload gambar gagal');return payload.url}
+  async function save(event){event.preventDefault();setBusy(true);setError('');setMessage('');try{if(!form.title.trim())throw new Error('Nama iklan wajib diisi');if(!form.targetUrl.trim())throw new Error('Link tujuan wajib diisi');if(!form.id&&!file)throw new Error('Pilih gambar banner terlebih dahulu');const imageUrl=await uploadImage();const body={title:form.title,slot:form.slot,imageUrl,targetUrl:form.targetUrl,altText:form.altText,isActive:form.isActive};const response=await fetch(form.id?`/api/admin/ads/${encodeURIComponent(form.id)}`:'/api/admin/ads',{method:form.id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||'Iklan gagal disimpan');setAds(current=>form.id?current.map(row=>row.id===payload.id?payload:row):[payload,...current]);setMessage('Iklan berhasil disimpan.');setForm({...emptyForm,...payload});setFile(null);setPreview(payload.imageUrl||'')}catch(err){setError(err.message||'Terjadi kesalahan')}finally{setBusy(false)}}
+  async function toggle(ad){setBusy(true);setError('');setMessage('');try{const response=await fetch(`/api/admin/ads/${encodeURIComponent(ad.id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...ad,isActive:!ad.isActive})});const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||'Status iklan gagal diubah');setAds(current=>current.map(row=>row.id===payload.id?payload:row.slot===payload.slot?{...row,isActive:false}:row));setMessage(payload.isActive?'Iklan diaktifkan.':'Iklan dinonaktifkan.')}catch(err){setError(err.message||'Terjadi kesalahan')}finally{setBusy(false)}}
+  async function remove(ad){if(!window.confirm(`Hapus iklan “${ad.title}”?`))return;setBusy(true);setError('');setMessage('');try{const response=await fetch(`/api/admin/ads/${encodeURIComponent(ad.id)}`,{method:'DELETE'});const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||'Iklan gagal dihapus');setAds(current=>current.filter(row=>row.id!==ad.id));if(form.id===ad.id)reset();setMessage('Iklan berhasil dihapus.')}catch(err){setError(err.message||'Terjadi kesalahan')}finally{setBusy(false)}}
 
-  async function uploadImage(){
-    if(!file)return form.imageUrl;
-    const data=new FormData();data.append('file',file);
-    const response=await fetch('/api/admin/ads/upload',{method:'POST',body:data});
-    const payload=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(payload.error||'Upload gambar gagal');
-    return payload.url;
-  }
-
-  async function save(event){
-    event.preventDefault();setBusy(true);setError('');setMessage('');
-    try{
-      if(!form.title.trim())throw new Error('Nama iklan wajib diisi');
-      if(!form.targetUrl.trim())throw new Error('Link tujuan wajib diisi');
-      if(!form.id&&!file)throw new Error('Pilih gambar banner terlebih dahulu');
-      const imageUrl=await uploadImage();
-      const body={title:form.title,slot:form.slot,imageUrl,targetUrl:form.targetUrl,altText:form.altText,isActive:form.isActive};
-      const response=await fetch(form.id?`/api/admin/ads/${encodeURIComponent(form.id)}`:'/api/admin/ads',{method:form.id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-      const payload=await response.json().catch(()=>({}));
-      if(!response.ok)throw new Error(payload.error||'Iklan gagal disimpan');
-      setAds(current=>form.id?current.map(row=>row.id===payload.id?payload:row):[payload,...current]);
-      setMessage('Iklan berhasil disimpan.');
-      setForm({...emptyForm,...payload});setFile(null);setPreview(payload.imageUrl||'');
-    }catch(err){setError(err.message||'Terjadi kesalahan')}finally{setBusy(false)}
-  }
-
-  async function toggle(ad){
-    setBusy(true);setError('');setMessage('');
-    try{
-      const response=await fetch(`/api/admin/ads/${encodeURIComponent(ad.id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...ad,isActive:!ad.isActive})});
-      const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||'Status iklan gagal diubah');
-      setAds(current=>current.map(row=>row.id===payload.id||row.slot===payload.slot?payload.id===row.id?payload:{...row,isActive:false}:row));
-      setMessage(payload.isActive?'Iklan diaktifkan.':'Iklan dinonaktifkan.');
-    }catch(err){setError(err.message||'Terjadi kesalahan')}finally{setBusy(false)}
-  }
-
-  async function remove(ad){
-    if(!window.confirm(`Hapus iklan “${ad.title}”?`))return;
-    setBusy(true);setError('');setMessage('');
-    try{
-      const response=await fetch(`/api/admin/ads/${encodeURIComponent(ad.id)}`,{method:'DELETE'});const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||'Iklan gagal dihapus');
-      setAds(current=>current.filter(row=>row.id!==ad.id));if(form.id===ad.id)reset();setMessage('Iklan berhasil dihapus.');
-    }catch(err){setError(err.message||'Terjadi kesalahan')}finally{setBusy(false)}
-  }
-
-  return <div className="ads-manager">
-    <div className="ads-manager-grid">
-      <section className="admin-panel ads-form-panel">
-        <div className="panel-head"><div><p className="admin-label">IKLAN</p><h2>{form.id?'Edit Iklan':'Tambah Iklan'}</h2></div>{form.id&&<button className="ghost-button" type="button" onClick={reset}>Iklan Baru</button>}</div>
-        <form onSubmit={save} className="ads-form">
-          <label>Nama iklan<input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} maxLength={160} placeholder="Contoh: Promo Ramadhan" required/></label>
-          <label>Posisi / slot<select value={form.slot} onChange={e=>setForm({...form,slot:e.target.value})}>{slots.map(([key,config])=><option key={key} value={key}>{config.label}</option>)}</select></label>
-          <label>Gambar banner<input type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onChange={onFileChange}/><small>JPG, JPEG, PNG, WebP · maksimal 2 MB.</small></label>
-          <label>Link tujuan<input value={form.targetUrl} onChange={e=>setForm({...form,targetUrl:e.target.value})} placeholder="https://contoh.com/promo" maxLength={2048} required/><small>Hanya http://, https://, atau path internal seperti /promo.</small></label>
-          <label>Teks alternatif<input value={form.altText} onChange={e=>setForm({...form,altText:e.target.value})} maxLength={180} placeholder="Deskripsi singkat banner"/></label>
-          <label className="ads-checkbox"><input type="checkbox" checked={form.isActive} onChange={e=>setForm({...form,isActive:e.target.checked})}/> Aktifkan iklan</label>
-          <div className="ads-preview"><div className="ads-preview-head"><span>Preview</span><small>{slot?.label}</small></div>{preview?<div className={`ads-preview-frame ads-preview-${slot?.variant||'leaderboard'}`} style={{aspectRatio:adAspectRatio(form.slot)}}><img src={preview} alt={form.altText||form.title||'Preview banner'}/></div>:<div className="ads-preview-empty" style={{aspectRatio:adAspectRatio(form.slot)}}>Pilih gambar untuk melihat preview.</div>}</div>
-          {error&&<div className="admin-error" role="alert">{error}</div>}{message&&<div className="admin-note-toast" role="status">{message}</div>}
-          <button className="filter-button ads-save" type="submit" disabled={busy}>{busy?'Menyimpan…':'Simpan Iklan'}</button>
-        </form>
-      </section>
-
-      <section className="admin-panel ads-list-panel"><div className="panel-head"><div><p className="admin-label">PLACEMENTS</p><h2>Semua Slot Banner</h2></div><span className="source-scope">{ads.length} iklan</span></div>
-        <div className="ads-list">{ads.length?ads.map(ad=><article key={ad.id} className={`ads-card ${ad.isActive?'is-active':''}`}>
-          <div className="ads-card-preview" style={{aspectRatio:adAspectRatio(ad.slot)}}><img src={ad.imageUrl} alt={ad.altText||ad.title}/></div>
-          <div className="ads-card-body"><div className="ads-card-head"><div><span className="ads-status">{ad.isActive?'AKTIF':'NONAKTIF'}</span><h3>{ad.title}</h3></div><span className="ads-slot-chip">{AD_SLOTS[ad.slot]?.label||ad.slot}</span></div>
-            <a href={ad.targetUrl} target={isExternal(ad.targetUrl)?'_blank':undefined} rel={isExternal(ad.targetUrl)?'noopener noreferrer sponsored':'sponsored'} className="ads-target">{ad.targetUrl}</a>
-            <small>Diperbarui {formatDate(ad.updatedAt)}</small>
-            <div className="ads-actions"><button type="button" onClick={()=>edit(ad)} disabled={busy}>Edit</button><button type="button" onClick={()=>toggle(ad)} disabled={busy}>{ad.isActive?'Nonaktifkan':'Aktifkan'}</button><button type="button" className="danger" onClick={()=>remove(ad)} disabled={busy}>Hapus</button></div>
-          </div>
-        </article>):<div className="empty-state">Belum ada iklan tersimpan.</div>}</div>
-      </section>
-    </div>
-  </div>
+  return <div className="ads-manager"><div className="ads-manager-grid"><section className="admin-panel ads-form-panel"><div className="panel-head"><div><p className="admin-label">IKLAN</p><h2>{form.id?'Edit Iklan':'Tambah Iklan'}</h2></div>{form.id&&<button className="ghost-button" type="button" onClick={reset}>Iklan Baru</button>}</div><form onSubmit={save} className="ads-form"><label>Nama iklan<input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} maxLength={160} placeholder="Contoh: Promo Ramadhan" required/></label><label>Posisi / slot<select value={form.slot} onChange={e=>setForm({...form,slot:e.target.value})}>{slots.map(([key,config])=><option key={key} value={key}>{config.label}</option>)}</select></label><label>Gambar banner<input type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onChange={onFileChange}/><small>JPG, JPEG, PNG, WebP · maksimal 2 MB.</small></label><label>Link tujuan<input value={form.targetUrl} onChange={e=>setForm({...form,targetUrl:e.target.value})} placeholder="https://contoh.com/promo" maxLength={2048} required/><small>Hanya http://, https://, atau path internal seperti /promo.</small></label><label>Teks alternatif<input value={form.altText} onChange={e=>setForm({...form,altText:e.target.value})} maxLength={180} placeholder="Deskripsi singkat banner"/></label><label className="ads-checkbox"><input type="checkbox" checked={form.isActive} onChange={e=>setForm({...form,isActive:e.target.checked})}/> Aktifkan iklan</label><div className="ads-preview"><div className="ads-preview-head"><span>Preview</span><small>{slot?.label}</small></div>{preview?<div className={`ads-preview-frame ads-preview-${slot?.variant||'leaderboard'}`} style={{aspectRatio:adAspectRatio(form.slot)}}><img src={preview} alt={form.altText||form.title||'Preview banner'}/></div>:<div className="ads-preview-empty" style={{aspectRatio:adAspectRatio(form.slot)}}>Pilih gambar untuk melihat preview.</div>}</div>{error&&<div className="admin-error" role="alert">{error}</div>}{message&&<div className="admin-note-toast" role="status">{message}</div>}<button className="filter-button ads-save" type="submit" disabled={busy}>{busy?'Menyimpan…':'Simpan Iklan'}</button></form></section><section className="admin-panel ads-list-panel"><div className="panel-head"><div><p className="admin-label">PLACEMENTS</p><h2>Semua Slot Banner</h2></div><span className="source-scope">{ads.length} iklan</span></div><div className="ads-list">{ads.length?ads.map(ad=><article key={ad.id} className={`ads-card ${ad.isActive?'is-active':''}`}><div className="ads-card-preview" style={{aspectRatio:adAspectRatio(ad.slot)}}><img src={ad.imageUrl} alt={ad.altText||ad.title}/></div><div className="ads-card-body"><div className="ads-card-head"><div><span className="ads-status">{ad.isActive?'AKTIF':'NONAKTIF'}</span><h3>{ad.title}</h3></div><span className="ads-slot-chip">{AD_SLOTS[ad.slot]?.label||ad.slot}</span></div><a href={ad.targetUrl} target={isExternal(ad.targetUrl)?'_blank':undefined} rel={isExternal(ad.targetUrl)?'noopener noreferrer sponsored':'sponsored'} className="ads-target">{ad.targetUrl}</a><small>Diperbarui {formatDate(ad.updatedAt)}</small><div className="ads-actions"><button type="button" onClick={()=>edit(ad)} disabled={busy}>Edit</button><button type="button" onClick={()=>toggle(ad)} disabled={busy}>{ad.isActive?'Nonaktifkan':'Aktifkan'}</button><button type="button" className="danger" onClick={()=>remove(ad)} disabled={busy}>Hapus</button></div></div></article>):<div className="empty-state">Belum ada iklan tersimpan.</div>}</div></section></div></div>
 }
