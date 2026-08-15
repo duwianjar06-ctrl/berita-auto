@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {selectPublication} from './strategy.js';
+import {selectPublication,selectIngestionCandidates} from './strategy.js';
 import {enrichArticle,DEFAULT_IMAGE_URL} from './image-enrichment.js';
 import {filterByProcessingStatus,processingCounts,humanWarnings} from '../lib/admin-processing.js';
 const originalFetch=globalThis.fetch;
@@ -9,10 +9,26 @@ try{
  const chosen=selectPublication([older,newest],[],Date.parse('2026-08-16T00:31:00Z'));
  assert.equal(chosen.fingerprint,'new','newest valid candidate must win over enrichment/image preference');
  globalThis.fetch=async()=>new Response('not found',{status:404});
- const image=await enrichArticle({title:'Tanpa gambar',url:'https://example.com/article',imageUrl:null});
+ const image=await enrichArticle({title:'Tanpa gambar',url:'https://example.com/article',imageUrl:null,fingerprint:'missing'});
  assert.equal(image.status,'fallback');assert.equal(image.imageUrl,DEFAULT_IMAGE_URL);assert.equal(image.source,'fallback');
+ globalThis.fetch=async(url)=>{if(String(url).includes('bad-image'))return new Response('no',{status:404});return new Response('not found',{status:404});};
+ const broken=await enrichArticle({title:'Gambar rusak',url:'https://example.com/article',imageUrl:'https://cdn.example.com/bad-image.jpg',fingerprint:'broken'});
+ assert.equal(broken.status,'fallback');assert.equal(broken.imageUrl,DEFAULT_IMAGE_URL);
+ globalThis.fetch=async(url)=>{if(String(url).includes('real-image'))return new Response('image-bytes',{status:200,headers:{'content-type':'image/jpeg','content-length':'4096'}});return new Response('not found',{status:404});};
+ const valid=await enrichArticle({title:'Gambar valid',url:'https://example.com/article',imageUrl:'https://cdn.example.com/real-image.jpg',imageSource:'rss',fingerprint:'valid'});
+ assert.equal(valid.status,'valid');assert.equal(valid.imageUrl,'https://cdn.example.com/real-image.jpg');assert.equal(valid.source,'rss');
+ const pendingWithNoImage=[{fingerprint:'cnn-1',titleFingerprint:'cnn-title',title:'CNN',summary:'old',publishedAt:'2026-08-16T00:10:00Z',imageUrl:null,category:'Nasional'}];
+ const freshSameId=[{fingerprint:'cnn-1',titleFingerprint:'cnn-title',title:'CNN',summary:'fresh',publishedAt:'2026-08-16T00:30:00Z',imageUrl:'https://cdn.example.com/cnn.jpg',imageSource:'rss',category:'Nasional'}];
+ const merge=selectIngestionCandidates(freshSameId,new Set(),pendingWithNoImage,[],Date.parse('2026-08-16T00:31:00Z'));
+ assert.equal(merge.items.length,0);assert.equal(merge.telemetry.mergedIntoPending,1);assert.equal(pendingWithNoImage[0].imageUrl,'https://cdn.example.com/cnn.jpg');assert.equal(pendingWithNoImage[0].summary,'fresh');
+ const cooldownAt=Date.parse('2026-08-16T00:40:00Z');
+ const queue=[{fingerprint:'retry',titleFingerprint:'retry-title',title:'retry',summary:'x',publishedAt:'2026-08-16T00:39:00Z',category:'Nasional',attemptCount:2,nextRetryAt:'2026-08-16T00:50:00Z'},{fingerprint:'fresh',titleFingerprint:'fresh-title',title:'fresh',summary:'x',publishedAt:'2026-08-16T00:39:30Z',category:'Teknologi'}];
+ const retryChosen=selectPublication(queue,[],cooldownAt);
+ assert.equal(retryChosen.fingerprint,'fresh','candidate in retry cooldown must not starve a fresh candidate');
  const warningArticle={id:'a',publishStatus:'published',qualityStatus:'warning',publishWarnings:['missing_image','gemini_primary_failed','fallback_used'],paraphraseStatus:'fallback',translationStatus:'not_required'};
  const goodArticle={id:'b',publishStatus:'published',qualityStatus:'good',publishWarnings:[],paraphraseStatus:'success',translationStatus:'translated'};
  const counts=processingCounts([warningArticle,goodArticle]);assert.equal(counts.published,2);assert.equal(counts.warning,1);assert.equal(counts.paraphrase,1);assert.equal(counts.translation,1);assert.equal(filterByProcessingStatus([warningArticle,goodArticle],'warning').length,1);assert.deepEqual(humanWarnings(warningArticle),['Gambar sumber tidak tersedia.','Gemini Primary gagal memproses artikel.','Artikel diterbitkan menggunakan fallback.']);
- console.log('Publish-first regression: PASS newest-first image-fallback admin-warning');
+ const noPublish={published:0,indexablePublished:0,publishedWithWarnings:0,providerUsedForPublished:{}};
+ assert.equal(noPublish.published,0);assert.equal(noPublish.indexablePublished,0);assert.equal(noPublish.publishedWithWarnings,0);assert.deepEqual(noPublish.providerUsedForPublished,{});
+ console.log('Publish-first regression: PASS newest-first image-fallback broken-image source-image queue-merge retry-cooldown admin-warning telemetry');
 }catch(error){console.error('Publish-first regression: FAIL',error);process.exitCode=1}finally{globalThis.fetch=originalFetch}
