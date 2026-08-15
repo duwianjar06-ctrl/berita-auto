@@ -12,7 +12,7 @@ import './intro.css';
 
 export const dynamic='force-dynamic';
 function byCategory(items,name){return items.filter(a=>(a.category||'').toLowerCase()===name.toLowerCase());}
-function publicArticle(a){return String(a.translationStatus||'translated').toLowerCase()!=='pending';}
+function publicArticle(a){const language=String(a.language||'id').toLowerCase();const status=String(a.translationStatus||'translated').toLowerCase();return language==='id'||status==='translated';}
 export default async function EditorialHome(){
  const articles=await readArticles();
  const visible=articles.filter(publicArticle);
