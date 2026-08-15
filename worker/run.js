@@ -3,6 +3,7 @@ import {fetchNews} from '../lib/rss.js';
 import {generateArticle} from '../lib/ai.js';
 import {readArticles,writeArticles,readPending,writePending} from '../lib/storage.js';
 import {persistenceConfigured,acquireLock,releaseLock} from '../lib/persistence.js';
+import {FOREIGN_SOURCE_IDS} from '../lib/sources.js';
 import {articleFingerprint,titleFingerprint} from './normalize.js';
 import {selectIngestionCandidates,selectPublication,publicationPlan,queueConfig} from './strategy.js';
 import {enrichArticle,isValidImageUrl} from './image-enrichment.js';
@@ -10,10 +11,11 @@ import {classifyCategory} from './category.js';
 import {startPipelineRun,setPipelineStage,finishPipelineStage,completePipelineRun,getPipelineSnapshot} from '../lib/pipeline.js';
 import {slugify} from '../lib/article-url.js';
 const LOCK_KEY='ba:news:publication-lock';const LOCK_TTL_SECONDS=120;const MAX_PENDING_TRANSLATIONS=2;
+function needsTranslationRetry(article){const status=String(article?.translationStatus||'').toLowerCase();if(status==='pending')return true;return FOREIGN_SOURCE_IDS.has(String(article?.sourceId||''))&&status!=='translated';}
 async function retryPendingTranslations(published){
- const pending=published.filter(a=>String(a.translationStatus||'').toLowerCase()==='pending').slice(0,MAX_PENDING_TRANSLATIONS);if(!pending.length)return published;
+ const candidates=published.filter(needsTranslationRetry).slice(0,MAX_PENDING_TRANSLATIONS);if(!candidates.length)return published;
  let updated=[...published];
- for(const article of pending){try{const ai=await generateArticle({...article,language:article.language||'en'});if(ai.generationProvider!=='fallback'&&ai.language==='id'&&ai.translationStatus==='translated'){const next={...article,title:ai.title,excerpt:ai.excerpt,summary:ai.excerpt,content:ai.content,language:'id',translationStatus:'translated',robots:'index,follow',indexable:true,generationProvider:ai.generationProvider,generationModel:ai.generationModel,generationAt:ai.generationAt,generationDurationMs:Date.now()-Date.parse(article.generationAt||article.createdAt||new Date().toISOString()),updatedAt:new Date().toISOString()};updated=updated.map(row=>row.id===article.id?next:row);console.log(`[translation] articleId=${article.id} provider=${ai.generationProvider} status=translated indexable=true`);}else console.log(`[translation] articleId=${article.id} status=pending`);}catch(error){console.warn(`[translation] articleId=${article.id} status=pending reason=${String(error?.message||error).slice(0,120)}`);}}
+ for(const article of candidates){const pendingArticle={...article,translationStatus:'pending',robots:'noindex,follow',indexable:false};updated=updated.map(row=>row.id===article.id?pendingArticle:row);try{const ai=await generateArticle({...pendingArticle,language:article.language&&article.language!=='id'?article.language:'en'});if(ai.generationProvider!=='fallback'&&ai.language==='id'&&ai.translationStatus==='translated'){const next={...pendingArticle,title:ai.title,excerpt:ai.excerpt,summary:ai.excerpt,content:ai.content,language:'id',translationStatus:'translated',robots:'index,follow',indexable:true,generationProvider:ai.generationProvider,generationModel:ai.generationModel,generationAt:ai.generationAt,generationDurationMs:Date.now()-Date.parse(article.generationAt||article.createdAt||new Date().toISOString()),updatedAt:new Date().toISOString()};updated=updated.map(row=>row.id===article.id?next:row);console.log(`[translation] articleId=${article.id} provider=${ai.generationProvider} status=translated indexable=true`);}else console.log(`[translation] articleId=${article.id} status=pending`);}catch(error){console.warn(`[translation] articleId=${article.id} status=pending reason=${String(error?.message||error).slice(0,120)}`);}}
  if(updated.some((row,i)=>row!==published[i]))await writeArticles(updated);return updated;
 }
 export async function runPublicationCycle({trigger='manual',now=Date.now()}={}){
