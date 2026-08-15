@@ -10,7 +10,7 @@
     "news:run": "node worker/run.js",
     "news:repair": "node worker/repair.js",
     "social:run": "node worker/social-run.js",
-    "test": "node worker/category-balance-regression.js && node worker/ai-provider-regression.js && node worker/article-route-regression.js && node worker/social-regression.js && node worker/ads-regression.js && node worker/paraphrase-regression.js && node worker/admin-ui-regression.js",
+    "test": "node worker/category-balance-regression.js && node worker/ai-provider-regression.js && node worker/article-route-regression.js && node worker/social-regression.js && node worker/ads-regression.js && node worker/paraphrase-regression.js && node worker/admin-ui-regression.js && node worker/admin-processing-regression.js",
     "test:social": "node worker/social-regression.js",
     "sitemap:verify": "node worker/sitemap-verification.js",
     "test:sitemap": "node worker/sitemap-verification.js",
@@ -18,7 +18,8 @@
     "test:category-balance": "node worker/category-balance-regression.js",
     "test:ads": "node worker/ads-regression.js",
     "test:paraphrase": "node worker/paraphrase-regression.js",
-    "test:admin-ui": "node worker/admin-ui-regression.js"
+    "test:admin-ui": "node worker/admin-ui-regression.js",
+    "test:admin-processing": "node worker/admin-processing-regression.js"
   },
   "dependencies": {
     "@auth/core": "0.41.3",
