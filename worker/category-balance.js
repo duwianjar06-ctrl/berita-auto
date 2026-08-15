@@ -36,15 +36,23 @@ export function categoryDistribution(published=[]){
   }
   const priority=categoryPriority({total,rows});
   priority.forEach((row,index)=>{row.priorityRank=index+1;});
-  console.log(`[category-balance] totalIndexable=${total} ${rows.map(row=>`${row.category}=${row.count}(${(row.share*100).toFixed(2)}%) deficit2=${(row.deficitTo2Percent*100).toFixed(2)}% recoveryDeficit=${(row.recoveryDeficitTo2_5Percent*100).toFixed(2)}% rank=${row.priorityRank??'-'}`).join(' | ')} underrepresented=${priority.map(row=>row.category).join(',')||'none'} priority=${priority[0]?.category||'none'}`);
   return {total,rows};
+}
+
+export function categoryTelemetry(distribution){
+  const priority=categoryPriority(distribution);
+  const nationalPenalty=shouldDeprioritizeNational(distribution);
+  return `[category-balance] totalIndexable=${distribution.total} ${distribution.rows.map(row=>`${row.category}=${row.count}(${(row.share*100).toFixed(2)}%) deficitTo2Percent=${(row.deficitTo2Percent*100).toFixed(2)}% recoveryDeficitTo2_5Percent=${(row.recoveryDeficitTo2_5Percent*100).toFixed(2)}% priorityRank=${row.priorityRank??'-'}`).join(' | ')} underrepresented=${priority.map(row=>row.category).join(',')||'none'} priority=${priority[0]?.category||'none'} nationalPenalty=${nationalPenalty?'active':'inactive'}`;
+}
+
+export function logCategoryDistribution(distribution){
+  console.log(categoryTelemetry(distribution));
+  return distribution;
 }
 
 export function categorySelectionScore(category,distribution){
   const row=distribution.rows.find(x=>x.category===category);
   if(!row||row.share>=CATEGORY_HEALTH_TARGET)return 0;
-  // Selection order is a balancing signal only. Image/content gates still
-  // decide whether the selected candidate is publishable.
   return Math.min(320,180+Math.round(row.recoveryDeficitTo2_5Percent*4000));
 }
 
