@@ -1,5 +1,4 @@
 name: Social Publishing CI
-
 # Validates the latest production social publishing pipeline on every feature-branch push.
 on:
   push:
@@ -8,9 +7,7 @@ on:
   pull_request:
     branches:
       - feature/auto-news-mvp
-
 permissions: {}
-
 jobs:
   validate:
     runs-on: ubuntu-latest
