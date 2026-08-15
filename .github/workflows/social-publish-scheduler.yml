@@ -2,7 +2,7 @@ name: Instagram Social Scheduler
 
 on:
   schedule:
-    - cron: "12,27,42,57 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions: {}
