@@ -1,0 +1,27 @@
+name: Security audit snapshot
+
+on:
+  push:
+    branches:
+      - feature/auto-news-mvp
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+      - run: npm ci
+      - name: Capture npm audit
+        run: |
+          npm audit --omit=dev --json > /tmp/npm-audit.json || true
+          node - <<'NODE'
+          const fs=require('fs');
+          const data=JSON.parse(fs.readFileSync('/tmp/npm-audit.json','utf8'));
+          console.log(JSON.stringify({metadata:data.metadata,vulnerabilities:data.vulnerabilities},null,2));
+          NODE
