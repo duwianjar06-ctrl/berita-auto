@@ -9,7 +9,7 @@ function deny(result){if(!result)return NextResponse.json({error:'Unauthorized'}
 
 export async function POST(request){
   const admin=await requireAdmin();const denied=deny(admin);if(denied)return denied;
-  if(!process.env.BLOB_READ_WRITE_TOKEN)return NextResponse.json({error:'BLOB_READ_WRITE_TOKEN is not configured'},{status:503});
+  if(!process.env.BLOB_READ_WRITE_TOKEN){console.warn('[ads] blob_storage_not_configured');return NextResponse.json({error:'Storage gambar belum dikonfigurasi.'},{status:503});}
   try{
     const form=await request.formData();
     const file=form.get('file');
