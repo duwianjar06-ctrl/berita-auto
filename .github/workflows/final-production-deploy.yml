@@ -1,0 +1,67 @@
+name: Final production deployment
+
+on:
+  push:
+    branches:
+      - feature/auto-news-mvp
+    paths:
+      - .github/workflows/final-production-deploy.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: final-production-deploy
+  cancel-in-progress: false
+
+env:
+  VERCEL_PROJECT_ID: prj_fMkUHOS5fVF5yH8XSJst3LBBatNj
+  VERCEL_SCOPE: team_Ld87PhDYdLImVRur1vdgT20q
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Require Vercel credential
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo 'VERCEL_TOKEN GitHub Secret is required for production deployment.'
+            exit 1
+          fi
+
+      - name: Compare GitHub HEAD with current Production SHA
+        id: compare
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          response=$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&target=production&limit=1")
+          production_sha=$(node -e "const x=JSON.parse(process.argv[1]); console.log(x.deployments?.[0]?.meta?.githubCommitSha||'')" "$response")
+          echo "production_sha=$production_sha" >> "$GITHUB_OUTPUT"
+          echo "github_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          if [ "$production_sha" = "$GITHUB_SHA" ]; then
+            echo 'production already current'
+            echo 'needs_deploy=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'production differs from GitHub HEAD'
+            echo 'needs_deploy=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy FINAL HEAD to Vercel Production
+        if: steps.compare.outputs.needs_deploy == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_SCOPE" \
+            -m githubCommitOrg=projectdaaw-bot \
+            -m githubCommitRepo=berita-auto \
+            -m githubCommitRef=feature/auto-news-mvp \
+            -m githubCommitSha="${GITHUB_SHA}" \
+            -m githubDeployment=1
