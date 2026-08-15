@@ -34,12 +34,12 @@ async function fetchPageParagraphs(url){
 }
 export async function fetchSourceMaterial(item){
   const rssParagraphs=uniqueParagraphs(String(item.sourceMaterial||'').split(/\n{2,}/));
-  const rssMaterial=rssParagraphs.slice(0,24).join('\n\n').slice(0,28000);
+  const rssMaterial=rssParagraphs.slice(0,40).join('\n\n').slice(0,28000);
   const rssWords=wordCount(rssMaterial);
-  if(rssParagraphs.length>=2&&rssWords>=350){console.log(`[content] publisher=${item.publisher||item.sourceName||'unknown'} sourceChars=${rssMaterial.length} sourceWords=${rssWords} sourceParagraphs=${rssParagraphs.length} status=rss_content`);return rssMaterial;}
+  if(rssParagraphs.length>=2&&rssWords>=700){console.log(`[content] publisher=${item.publisher||item.sourceName||'unknown'} sourceChars=${rssMaterial.length} sourceWords=${rssWords} sourceParagraphs=${rssParagraphs.length} status=rss_content`);return rssMaterial;}
   const enriched=await fetchPageParagraphs(item.url);
   const merged=uniqueParagraphs([...rssParagraphs,...enriched]);
-  const material=merged.slice(0,24).join('\n\n').slice(0,28000);
+  const material=merged.slice(0,40).join('\n\n').slice(0,28000);
   const words=wordCount(material);
   console.log(`[content] publisher=${item.publisher||item.sourceName||'unknown'} sourceChars=${material.length} sourceWords=${words} sourceParagraphs=${merged.length} status=${material?'enriched':'empty'} rssWords=${rssWords} enrichedParagraphs=${enriched.length}`);
   return material||'';
