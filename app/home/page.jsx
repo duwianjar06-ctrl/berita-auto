@@ -7,12 +7,14 @@ import {readArticles} from '../../lib/storage.js';
 import {getPopularArticles,analyticsConfigured} from '../../lib/analytics.js';
 import {articlePath} from '../../lib/article-url.js';
 import {categories} from '../../lib/categories.js';
+import {NEWS_SOURCES} from '../../lib/sources.js';
 import './editorial.css';
 import './intro.css';
 
 export const dynamic='force-dynamic';
+const FOREIGN_SOURCE_IDS=new Set(NEWS_SOURCES.filter(source=>source.language!=='id').map(source=>source.id));
 function byCategory(items,name){return items.filter(a=>(a.category||'').toLowerCase()===name.toLowerCase());}
-function publicArticle(a){const language=String(a.language||'id').toLowerCase();const status=String(a.translationStatus||'translated').toLowerCase();return language==='id'||status==='translated';}
+function publicArticle(a){const language=String(a.language||'id').toLowerCase();const status=String(a.translationStatus||'translated').toLowerCase();const sourceId=String(a.sourceId||'');return status==='translated'||(language==='id'&&!FOREIGN_SOURCE_IDS.has(sourceId));}
 export default async function EditorialHome(){
  const articles=await readArticles();
  const visible=articles.filter(publicArticle);
