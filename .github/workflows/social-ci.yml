@@ -1,5 +1,6 @@
 name: Social Publishing CI
 
+# Validates the latest production social publishing pipeline on every feature-branch push.
 on:
   push:
     branches:
