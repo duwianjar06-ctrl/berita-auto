@@ -21,5 +21,28 @@
     "robots":"noindex,follow",
     "indexable":false,
     "recoverySource":"git-history:21f09f10975a4173357da78e78c18620aff50053"
+  },
+  {
+    "id":"8b5f1575540d8257a5e4adaf",
+    "fingerprint":"8b5f1575540d8257a5e4adaf",
+    "slug":"sudin-gulkarmat-tiga-kapal-tradisional-terbakar-di-muara-baru-jakut",
+    "title":"Sudin Gulkarmat: Tiga kapal tradisional terbakar di Muara Baru Jakut",
+    "summary":"Suku Dinas Penanggulangan Kebakaran dan Penyelamatan (Sudin Gulkarmat) Jakarta Utara dan Kepulauan Seribu menyebutkan ...",
+    "excerpt":"Suku Dinas Penanggulangan Kebakaran dan Penyelamatan (Sudin Gulkarmat) Jakarta Utara dan Kepulauan Seribu menyebutkan ...",
+    "content":"Suku Dinas Penanggulangan Kebakaran dan Penyelamatan (Sudin Gulkarmat) Jakarta Utara dan Kepulauan Seribu menyebutkan ...\n\nSumber: https://www.antaranews.com/berita/5693323/sudin-gulkarmat-tiga-kapal-tradisional-terbakar-di-muara-baru-jakut",
+    "url":"https://www.antaranews.com/berita/5693323/sudin-gulkarmat-tiga-kapal-tradisional-terbakar-di-muara-baru-jakut",
+    "sourceUrl":"https://www.antaranews.com/rss/terkini.xml",
+    "sourceName":"ANTARA Terkini",
+    "category":"Nasional",
+    "imageUrl":"https://cdn.antaranews.com/cache/1200x800/2026/08/13/51936a86-b28f-420a-9fb8-1222c4024d3b.jpeg",
+    "imageSource":"rss",
+    "publishedAt":"Thu, 13 Aug 2026 21:58:09 +0700",
+    "sourcePublishedAt":"Thu, 13 Aug 2026 21:58:09 +0700",
+    "createdAt":"2026-08-13T15:16:48.391Z",
+    "language":"id",
+    "translationStatus":"recovered",
+    "robots":"noindex,follow",
+    "indexable":false,
+    "recoverySource":"git-history:21f09f10975a4173357da78e78c18620aff50053"
   }
 ]
