@@ -1,4 +1,5 @@
-export default function AdSlot({variant='leaderboard',placement='',className=''}){
+export default function AdSlot({variant='leaderboard',placement='',className='',enabled=true}){
+  if(enabled===false)return null;
   const link='https://wa.me/628515793801?text=Halo%20Berita%20Auto%2C%20saya%20tertarik%20memasang%20iklan%20di%20Berita%20Auto.';
   const copy={
     leaderboard:{title:'Jangkau lebih banyak pembaca bersama Berita Auto',text:'Promosikan brand, produk, layanan, bisnis, atau event Anda melalui ruang iklan Berita Auto.'},
@@ -12,12 +13,6 @@ export default function AdSlot({variant='leaderboard',placement='',className=''}
       <strong>{copy.title}</strong>
       <p>{copy.text}</p>
       <a href={link} target="_blank" rel="noopener noreferrer">Pasang Iklan ↗</a>
-    </div>
-    <div className="ad-slot-art" aria-hidden="true">
-      <span className="ad-slot-orb"/>
-      <span className="ad-slot-sheet ad-slot-sheet-a"/>
-      <span className="ad-slot-sheet ad-slot-sheet-b"/>
-      <span className="ad-slot-spark"/>
     </div>
   </aside>;
 }
