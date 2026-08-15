@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - feature/auto-news-mvp
-    paths:
-      - .github/workflows/final-production-deploy.yml
   workflow_dispatch:
 
 permissions:
