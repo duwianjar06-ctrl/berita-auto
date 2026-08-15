@@ -43,7 +43,9 @@ export function categoryDistribution(published=[]){
 export function categorySelectionScore(category,distribution){
   const row=distribution.rows.find(x=>x.category===category);
   if(!row||row.share>=CATEGORY_HEALTH_TARGET)return 0;
-  return Math.min(180,40+Math.round(row.recoveryDeficitTo2_5Percent*4000));
+  // Selection order is a balancing signal only. Image/content gates still
+  // decide whether the selected candidate is publishable.
+  return Math.min(320,180+Math.round(row.recoveryDeficitTo2_5Percent*4000));
 }
 
 export function shouldDeprioritizeNational(distribution){
