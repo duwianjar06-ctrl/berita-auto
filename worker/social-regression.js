@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import {deterministicCaption,scoreSocialArticle,selectBestSocialArticle,titleSimilarity,socialConfig,dailyKey,shouldSkipCooldown,shouldSkipDailyLimit,shouldSkipMetaBuffer} from '../lib/social.js';
 import {classifyInstagramError,instagramConfig,instagramConfigured} from '../lib/instagram.js';
-const article={id:'a1',slug:'contoh-berita',title:'Pemerintah umumkan kebijakan baru hari ini',excerpt:'Ringkasan faktual mengenai kebijakan baru.',publisher:'ANTARA',category:'Nasional',sitePublishedAt:new Date().toISOString(),sourceWeight:5};
+import {socialVisualProfile,buildSocialSlides} from '../lib/social-visual.js';
+import {shouldUseCarousel,buildCarouselImageUrls,visualRelevance} from '../lib/social-carousel.js';
+const article={id:'a1',slug:'contoh-berita',title:'Pemerintah umumkan kebijakan baru hari ini',excerpt:'Ringkasan faktual mengenai kebijakan baru.',content:'Pemerintah menjelaskan rincian kebijakan baru yang berlaku mulai pekan ini. Kebijakan ini mencakup perubahan layanan publik, tahapan pelaksanaan, dan informasi bagi masyarakat yang terdampak. Pemerintah meminta masyarakat mengikuti informasi resmi dan tidak menyebarkan kabar yang belum terverifikasi.',publisher:'ANTARA',category:'Nasional',sitePublishedAt:new Date().toISOString(),sourceWeight:5};
 assert.ok(deterministicCaption(article).includes('Baca selengkapnya: https://berita-auto.vercel.app/berita/contoh-berita'));
 assert.ok(scoreSocialArticle(article,{recentPublished:[]})>10);
 assert.equal(titleSimilarity('Pemerintah umumkan kebijakan baru','Pemerintah umumkan kebijakan baru'),1);
@@ -17,4 +19,7 @@ assert.equal(shouldSkipMetaBuffer({available:true,remaining:10},10),true);assert
 process.env.INSTAGRAM_ENABLED='false';assert.equal(instagramConfig().enabled,false);assert.equal(instagramConfigured(),false);
 process.env.INSTAGRAM_ENABLED='true';delete process.env.INSTAGRAM_USER_ID;delete process.env.INSTAGRAM_ACCESS_TOKEN;assert.equal(instagramConfigured(),false);
 process.env.INSTAGRAM_MIN_INTERVAL_MINUTES='20';process.env.INSTAGRAM_MAX_POSTS_PER_DAY='50';process.env.INSTAGRAM_PUBLISHING_LIMIT_BUFFER='10';const cfg=socialConfig();assert.deepEqual(cfg,{minIntervalMinutes:20,maxPostsPerDay:50,limitBuffer:10});assert.match(dailyKey(Date.parse('2026-08-15T12:00:00Z')),/^ba:social:instagram:daily:2026-08-15$/);
+const visual=socialVisualProfile({...article,category:'Teknologi',title:'Startup teknologi AI luncurkan chip baru'});assert.equal(visual.category,'Teknologi');assert.ok(visual.keywords.length>0);assert.equal(visualRelevance({...article,category:'Bencana',title:'Gempa bumi mengguncang kota'}).category,'Bencana');
+assert.equal(shouldUseCarousel(article),true);assert.equal(buildSocialSlides(article).length,2);assert.equal(buildCarouselImageUrls('https://berita-auto.vercel.app','a1',2)[1],'https://berita-auto.vercel.app/api/social-card/a1?slide=2');
+assert.equal(shouldUseCarousel({...article,content:'Ringkasan singkat.'}),false);
 console.log('social regression: PASS');
