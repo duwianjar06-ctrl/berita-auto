@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {renderStateForRun,stageForRun,normalizeSchedulerStatus,mediaIdMessage,errorState,classifyRetry,statusLabel} from '../lib/social-telemetry.js';
-
 const dashboard=readFileSync(new URL('../app/admin-instagram/InstagramDashboard.jsx',import.meta.url),'utf8');
 const route=readFileSync(new URL('../app/api/admin/instagram/status/route.js',import.meta.url),'utf8');
 const admin=readFileSync(new URL('../lib/admin-instagram.js',import.meta.url),'utf8');
@@ -9,7 +8,6 @@ const css=readFileSync(new URL('../app/admin-instagram/admin-instagram.css',impo
 const social=readFileSync(new URL('../lib/social.js',import.meta.url),'utf8');
 const socialRun=readFileSync(new URL('./social-run.js',import.meta.url),'utf8');
 const instagram=readFileSync(new URL('../lib/instagram.js',import.meta.url),'utf8');
-
 assert.equal(renderStateForRun({reason:'cooldown'}),'COOLDOWN');
 assert.equal(renderStateForRun({reason:'queue_empty'}),'NOT_REQUIRED');
 assert.equal(renderStateForRun({status:'published'}),'RENDER_SUCCESS');
@@ -33,22 +31,13 @@ assert.match(mediaIdMessage({status:'published'}),/Media ID tidak tercatat/);
 assert.equal(errorState({}).state,'NO_ERROR');
 assert.equal(errorState({error:'x'}).state,'ERROR');
 assert.equal(errorState({warning:'x'}).state,'WARNING');
-assert.equal(classifyRetry({status:429}),true);
-assert.equal(classifyRetry({status:503}),true);
-assert.equal(classifyRetry({status:400,reason:'meta_publishing_limit'}),true);
-assert.equal(classifyRetry({status:401,reason:'auth_token_invalid'}),false);
-assert.equal(classifyRetry({status:403,reason:'permission_denied'}),false);
-assert.equal(classifyRetry({reason:'instagram_timeout'}),true);
-assert.equal(statusLabel('QUEUED'),'Menunggu diproses');
-assert.equal(statusLabel('META_PUBLISHING_LIMIT'),'Menunggu kuota publishing Meta');
-assert.equal(statusLabel('UNKNOWN_LEGACY'),'Data lama — telemetry tidak tersedia');
-assert.match(route,/auth\(\)/);assert.match(route,/ADMIN_EMAILS/);assert.match(route,/Unauthorized/);
-assert.doesNotMatch(route,/INSTAGRAM_ACCESS_TOKEN/);assert.doesNotMatch(route,/CRON_SECRET.*json/);
-assert.match(admin,/qstash:/);assert.match(admin,/qstashUsed:false/);assert.match(admin,/githubActions:/);assert.match(admin,/readSocialRuns\(100\)/);assert.match(admin,/secretsExposed:false/);
+assert.equal(classifyRetry({status:429}),true);assert.equal(classifyRetry({status:503}),true);assert.equal(classifyRetry({status:400,reason:'meta_publishing_limit'}),true);assert.equal(classifyRetry({status:401,reason:'auth_token_invalid'}),false);assert.equal(classifyRetry({status:403,reason:'permission_denied'}),false);assert.equal(classifyRetry({reason:'instagram_timeout'}),true);
+assert.equal(statusLabel('QUEUED'),'Menunggu diproses');assert.equal(statusLabel('META_PUBLISHING_LIMIT'),'Menunggu kuota publishing Meta');assert.equal(statusLabel('UNKNOWN_LEGACY'),'Data lama — telemetry tidak tersedia');
+assert.match(route,/auth\(\)/);assert.match(route,/ADMIN_EMAILS/);assert.match(route,/Unauthorized/);assert.doesNotMatch(route,/INSTAGRAM_ACCESS_TOKEN/);assert.doesNotMatch(route,/CRON_SECRET.*json/);
+assert.match(admin,/qstash:/);assert.match(admin,/qstashUsed:false/);assert.match(admin,/githubActions:/);assert.match(admin,/readSocialRuns\(100\)/);assert.match(admin,/secretsExposed:false/);assert.match(admin,/nextCandidate/);assert.match(admin,/categoryDistribution/);assert.match(admin,/metaPublishing/);
 assert.match(social,/INSTAGRAM_MIN_INTERVAL_MINUTES/);assert.match(social,/shouldSkipCooldown/);assert.match(social,/meta_publishing_limit/);assert.match(social,/2207042/);
-assert.match(dashboard,/STATUS PENGERJAAN TERAKHIR/);assert.match(dashboard,/RETRY_SCHEDULED/);assert.match(dashboard,/Media ID/);assert.match(dashboard,/Glyph coverage/);assert.match(dashboard,/Tofu \/ kotak-kotak/);assert.match(dashboard,/Refresh/);assert.match(dashboard,/visibilityState/);assert.match(dashboard,/ig-stepper/);
-assert.doesNotMatch(dashboard,/Objects are not valid as a React child/);assert.doesNotMatch(dashboard,/JSON\.stringify\(data/);
-assert.match(css,/aspect-ratio:4\/5/);assert.match(css,/@media\(max-width:700px\)/);assert.match(css,/overflow-x:hidden/);assert.match(css,/ig-stage/);assert.match(css,/ig-history/);
-assert.match(socialRun,/getSocialFontDiagnostics/);assert.match(socialRun,/cardUrls/);assert.match(socialRun,/failureStage/);assert.match(socialRun,/retryable/);assert.match(socialRun,/nextRetryAt/);assert.match(socialRun,/httpStatus/);assert.match(socialRun,/metaCode/);assert.match(socialRun,/1080/);assert.match(socialRun,/1350/);assert.match(socialRun,/format:'jpeg'/);
-assert.match(instagram,/metaSubcode/);assert.match(instagram,/2207042/);assert.match(instagram,/publishing_usage/);
+assert.match(dashboard,/STATUS INSTAGRAM/);assert.match(dashboard,/POSTING TERAKHIR/);assert.match(dashboard,/POSTING BERIKUTNYA/);assert.match(dashboard,/ANTREAN INSTAGRAM/);assert.match(dashboard,/RIWAYAT POSTING INSTAGRAM/);assert.match(dashboard,/DISTRIBUSI KATEGORI INSTAGRAM/);assert.match(dashboard,/LOG AKTIVITAS TEKNIS/);assert.match(dashboard,/ESTIMASI/);assert.match(dashboard,/Media ID/);assert.match(dashboard,/Refresh/);assert.match(dashboard,/visibilityState/);assert.doesNotMatch(dashboard,/Objects are not valid as a React child/);assert.doesNotMatch(dashboard,/JSON\.stringify\(data/);
+assert.match(css,/aspect-ratio:4\/5/);assert.match(css,/@media\(max-width:700px\)/);assert.match(css,/overflow-x:hidden/);assert.match(css,/ig-history/);assert.match(css,/ig-queue/);
+assert.match(socialRun,/getSocialFontDiagnostics/);assert.match(socialRun,/cardUrls/);assert.match(socialRun,/failureStage/);assert.match(socialRun,/retryable/);assert.match(socialRun,/nextRetryAt/);assert.match(socialRun,/httpStatus/);assert.match(socialRun,/metaCode/);assert.match(socialRun,/1080/);assert.match(socialRun,/1350/);assert.match(socialRun,/format:'jpeg'/);assert.match(socialRun,/getMediaPermalink/);assert.match(socialRun,/publishingUsage/);
+assert.match(instagram,/metaSubcode/);assert.match(instagram,/2207042/);assert.match(instagram,/publishing_usage/);assert.match(instagram,/getMediaPermalink/);
 console.log('instagram observability regression: PASS');
