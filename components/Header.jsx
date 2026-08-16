@@ -1,4 +1,4 @@
-import {categories,categorySlug} from '../lib/categories.js';
+import {categories} from '../lib/categories.js';
 import {readArticles} from '../lib/storage.js';
 import CategoryNav from './CategoryNav.jsx';
 
