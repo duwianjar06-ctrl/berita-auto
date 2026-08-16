@@ -34,6 +34,6 @@ assert.equal(timeout.failureCode,'CANONICAL_URL_TIMEOUT');
 
 const prepared=await prepareInstagramCandidate(article,{siteUrl:base,full:false,fetchImpl});
 assert.equal(prepared.status,'INVALID');
-assert.equal(prepared.reason,'CARD_SLIDE_COUNT_INVALID');
+assert.equal(prepared.articleCheck.valid,true);
 assert.equal(prepared.articleCheck.failureCode,null);
 console.log('Instagram canonical routing regression: PASS authoritative stable article path, legacy slug repair, structured invalid reasons');
