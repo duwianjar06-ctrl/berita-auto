@@ -1,0 +1,4 @@
+import {auth} from '../../../../auth.js';
+import {readArticles} from '../../../../lib/storage.js';
+export const dynamic='force-dynamic';
+export async function GET(request){try{const session=await auth();const email=session?.user?.email?.trim().toLowerCase();const allowed=(process.env.ADMIN_EMAILS||'').split(',').map(v=>v.trim().toLowerCase()).filter(Boolean);if(!email||!allowed.includes(email))return Response.json({ok:false},{status:401});const id=new URL(request.url).searchParams.get('id');if(!id)return Response.json({ok:false},{status:400});const articles=await readArticles();const article=articles.find(a=>String(a.id)===String(id)||String(a.fingerprint||'')===String(id));if(!article)return Response.json({ok:false},{status:404});return Response.json({ok:true,article},{headers:{'Cache-Control':'private, no-store'}})}catch(error){console.error('[admin-article]',error);return Response.json({ok:false},{status:503})}}
