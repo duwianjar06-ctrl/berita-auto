@@ -23,19 +23,24 @@ export async function prepareSocialCards(article,siteUrl,runId){
   return{sourceCardUrls:sourceUrls,cardUrls:cards.map(card=>card.url),cardMeta:cards,render};
 }
 
-export async function createAndPublishMedia(article,caption,cardUrls){
+async function publishSingleImage(url,caption){
+  const containerStarted=Date.now();
+  const containerId=await createMediaContainer({imageUrl:url,caption});
+  const ready=await pollContainerReady(containerId);
+  const containerMs=Date.now()-containerStarted;
+  if(!ready.ready)return{ready,containerId,cardUrls:[url],stage:'WAITING_CONTAINER',failureStage:'META_CONTAINER_STATUS',carousel:false,perf:{containerMs,publishMs:0}};
+  const publishStarted=Date.now();
+  const mediaId=await publishMediaContainer(containerId);
+  return{ready,containerId,mediaId,cardUrls:[url],stage:'SUCCESS',carousel:false,fallbackFromCarousel:false,failureStage:null,perf:{containerMs,publishMs:Date.now()-publishStarted}};
+}
+
+export async function createAndPublishMedia(article,caption,cardUrls,{preferSingleImage=false}={}){
   const started=Date.now();
   const urls=Array.isArray(cardUrls)?cardUrls.filter(Boolean):[];
   if(!urls.length||urls.length>2)throw Object.assign(new Error('social_card_invalid_persisted_urls'),{failureStage:'CARD_PERSIST',permanent:true});
-  if(urls.length===1){
-    const containerStarted=Date.now();
-    const containerId=await createMediaContainer({imageUrl:urls[0],caption});
-    const ready=await pollContainerReady(containerId);
-    const containerMs=Date.now()-containerStarted;
-    if(!ready.ready)return{ready,containerId,cardUrls:urls,stage:'WAITING_CONTAINER',failureStage:'META_CONTAINER_STATUS',perf:{containerMs,publishMs:0,totalMediaMs:Date.now()-started}};
-    const publishStarted=Date.now();
-    const mediaId=await publishMediaContainer(containerId);
-    return{ready,containerId,mediaId,cardUrls:urls,stage:'SUCCESS',carousel:false,failureStage:null,perf:{containerMs,publishMs:Date.now()-publishStarted,totalMediaMs:Date.now()-started}};
+  if(urls.length===1||preferSingleImage){
+    const result=await publishSingleImage(urls[0],caption);
+    return{...result,totalMediaMs:Date.now()-started,preferSingleImage};
   }
   const containerStarted=Date.now();
   const childIds=await createCarouselChildren(urls);
@@ -47,8 +52,17 @@ export async function createAndPublishMedia(article,caption,cardUrls){
   const containerMs=Date.now()-containerStarted;
   if(!ready.ready)return{ready,containerId,childIds,cardUrls:urls,stage:'WAITING_CONTAINER',failureStage:'META_CONTAINER_STATUS',carousel:true,perf:{containerMs,publishMs:0,totalMediaMs:Date.now()-started}};
   const publishStarted=Date.now();
-  const mediaId=await publishMediaContainer(containerId);
-  return{ready,containerId,childIds,mediaId,cardUrls:urls,stage:'SUCCESS',carousel:true,failureStage:null,perf:{containerMs,publishMs:Date.now()-publishStarted,totalMediaMs:Date.now()-started}};
+  try{
+    const mediaId=await publishMediaContainer(containerId);
+    return{ready,containerId,childIds,mediaId,cardUrls:urls,stage:'SUCCESS',carousel:true,failureStage:null,perf:{containerMs,publishMs:Date.now()-publishStarted,totalMediaMs:Date.now()-started}};
+  }catch(error){
+    if(Number(error?.metaCode)===9&&Number(error?.metaSubcode)===2207042){
+      console.warn('[instagram] carousel_publish_limit fallback=single_image');
+      const fallback=await publishSingleImage(urls[0],caption);
+      return{...fallback,childIds,carousel:false,fallbackFromCarousel:true,totalMediaMs:Date.now()-started,perf:{...(fallback.perf||{}),containerMs:(fallback.perf?.containerMs||0)+containerMs,publishMs:(fallback.perf?.publishMs||0)+(Date.now()-publishStarted),totalMediaMs:Date.now()-started}};
+    }
+    throw error;
+  }
 }
 
 function cardFromItem(item){return Array.isArray(item?.cardUrls)&&item.cardUrls.length?item.cardUrls:null;}
@@ -72,7 +86,7 @@ export async function runSocialCycle({trigger='manual',now=Date.now()}={}){
     const queueReadMs=Date.now()-queueStarted;const eligible=buildEligibleSocialQueue(queue);
     if(!eligible.length)return{status:'skipped',reason:'queue_empty',queueReadMs,fallbackReconciled,durationMs:Date.now()-cycleStarted};
     const metaStarted=Date.now();const usage=await getPublishingUsage();const metaLimitMs=Date.now()-metaStarted;
-    if(shouldSkipMetaBuffer(usage,cfg.limitBuffer))return{status:'skipped',reason:'meta_limit_buffer',remaining:usage.remaining,queueReadMs,metaLimitMs,durationMs:Date.now()-cycleStarted};
+    if(shouldSkipMetaBuffer(usage,cfg.limitBuffer))return{status:'skipped',reason:'meta_limit_buffer',remaining:usage.remaining,usage:usage.usage,total:usage.total,queueReadMs,metaLimitMs,durationMs:Date.now()-cycleStarted};
     const recent=await readRecentPublished(20);const selected=selectBestSocialArticle(eligible,{now,recentPublished:recent});
     if(!selected)return{status:'skipped',reason:'no_worthy_content',queueReadMs,metaLimitMs,durationMs:Date.now()-cycleStarted};
     const publishedState=await getJson(`ba:social:instagram:published:${selected.articleId}`);
@@ -91,8 +105,9 @@ export async function runSocialCycle({trigger='manual',now=Date.now()}={}){
         processing={...processing,sourceCardUrls,cardUrls:cards,previewUrl:cards[0]||null,cardMeta:prepared.cardMeta,render,font,glyph:{unsupportedGlyphs:font.unsupportedGlyphs,validationStatus:font.unsupportedGlyphs===null?'UNKNOWN_LEGACY':font.unsupportedGlyphs===0?'PASS':'WARNING'},currentStage:'CARD_PERSIST',updatedAt:new Date().toISOString()};
         await setJson(`ba:social:instagram:item:${processing.articleId}`,processing);
       }
-      const result=await createAndPublishMedia(article,caption,cards);
-      processing={...processing,containerId:result.containerId||processing.containerId,carousel:Boolean(result.carousel),childContainerIds:result.childIds||processing.childContainerIds||[],cardUrls:result.cardUrls||cards,previewUrl:(result.cardUrls||cards)[0]||null,currentStage:result.stage||'PUBLISHING',updatedAt:new Date().toISOString()};
+      const preferSingleImage=Boolean(usage?.available&&Number(usage?.total)>=100&&Number(usage?.usage)>=50);
+      const result=await createAndPublishMedia(article,caption,cards,{preferSingleImage});
+      processing={...processing,containerId:result.containerId||processing.containerId,carousel:Boolean(result.carousel),fallbackFromCarousel:Boolean(result.fallbackFromCarousel),childContainerIds:result.childIds||processing.childContainerIds||[],cardUrls:result.cardUrls||cards,previewUrl:(result.cardUrls||cards)[0]||null,currentStage:result.stage||'PUBLISHING',updatedAt:new Date().toISOString()};
       await setJson(`ba:social:instagram:item:${processing.articleId}`,processing);
       if(!result.ready.ready){
         const err=result.ready.permanent?new Error('instagram_media_processing_failed'):new Error('instagram_media_processing_pending');
@@ -107,7 +122,7 @@ export async function runSocialCycle({trigger='manual',now=Date.now()}={}){
       if(!record)return{status:'persist_error',articleId:article.id,mediaId,cardUrls:processing.cardUrls,render:processing.render,font,queueReadMs,metaLimitMs,durationMs:Date.now()-cycleStarted};
       let publishedToday=daily+1;try{publishedToday=await incrementDailyPublishedCount(now);}catch{}
       const perf=result.perf||{};
-      return{status:'published',articleId:article.id,slug:article.slug,mediaId,publishedAt,carousel:Boolean(result.carousel),slideCount:buildSocialSlides(article).length,queueRemaining:Math.max(0,eligible.length-1),publishedToday,record,cardUrls:processing.cardUrls,render:processing.render,font,glyph:processing.glyph,perf:{queueReadMs,metaLimitMs,containerMs:perf.containerMs||0,publishMs:perf.publishMs||0,totalMs:Date.now()-cycleStarted}};
+      return{status:'published',articleId:article.id,slug:article.slug,mediaId,publishedAt,carousel:Boolean(result.carousel),fallbackFromCarousel:Boolean(result.fallbackFromCarousel),slideCount:buildSocialSlides(article).length,queueRemaining:Math.max(0,eligible.length-1),publishedToday,record,cardUrls:processing.cardUrls,render:processing.render,font,glyph:processing.glyph,perf:{queueReadMs,metaLimitMs,containerMs:perf.containerMs||0,publishMs:perf.publishMs||0,totalMs:Date.now()-cycleStarted}};
     }catch(error){
       const classification=classifyInstagramError(error);
       const permanent=classification.kind==='permanent'||Boolean(error?.permanent);
