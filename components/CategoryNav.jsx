@@ -76,6 +76,11 @@ export default function CategoryNav({counts={}}){
         Kategori <span aria-hidden="true">▾</span>
       </button>
       {open&&<div className="category-nav-mobile-panel" role="menu">
+        <form className="category-nav-mobile-search" action="/cari" onSubmit={go}>
+          <label className="sr-only" htmlFor="mobile-category-search">Cari berita</label>
+          <input id="mobile-category-search" name="q" placeholder="Cari berita…"/>
+          <button type="submit">Cari</button>
+        </form>
         {ordered.map(item=><div key={item.name} role="none">{categoryLink(item,'category-nav-dropdown-link')}</div>)}
       </div>}
     </div>
@@ -92,6 +97,9 @@ export default function CategoryNav({counts={}}){
       .category-nav-dropdown-link{width:100%;justify-content:flex-start;color:var(--text-soft);padding:9px 10px;min-height:36px}
       .category-nav-dropdown-link:hover{color:var(--primary-hover);background:#fff7ed}
       .category-nav-mobile{display:none}
+      .category-nav-mobile-search{grid-column:1/-1;display:flex;gap:7px;padding:2px 2px 7px}
+      .category-nav-mobile-search input{min-width:0;flex:1;height:38px;border:1px solid var(--border);border-radius:10px;padding:0 10px;color:var(--text)}
+      .category-nav-mobile-search button{border:0;border-radius:10px;padding:0 12px;background:var(--primary);color:#fff;font-weight:800}
       @media(max-width:980px){
         .category-nav{border-top:0}
         .category-nav-desktop{display:none}
