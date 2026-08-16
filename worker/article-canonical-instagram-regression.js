@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {articlePath} from '../lib/article-url.js';
+import {articlePath,articleStableId} from '../lib/article-url.js';
 import {validateArticleForInstagram,prepareInstagramCandidate} from '../lib/social-preparation.js';
 
 const base='https://berita-auto.vercel.app';
@@ -8,6 +8,7 @@ const canonical=`${base}${articlePath(article)}`;
 let requested=[];
 const fetchImpl=async url=>{requested.push(String(url));return new Response('<html>ok</html>',{status:String(url)===canonical?200:404,headers:{'content-type':'text/html'},url:String(url)});};
 
+assert.equal(articleStableId(article),article.stableId);
 const check=await validateArticleForInstagram(article,{siteUrl:base,fetchImpl});
 assert.equal(check.valid,true);
 assert.equal(check.canonicalUrl,canonical);
@@ -23,7 +24,7 @@ assert.equal(repaired.publicStatus,'PASS');
 
 const missing=await validateArticleForInstagram({...article,id:null},{siteUrl:base,checkPublicUrl:false});
 assert.equal(missing.failureCode,'ARTICLE_MISSING_ID');
-const noStable=await validateArticleForInstagram({...article,id:'0123456789abcdef01234568',fingerprint:null,stableId:null},{siteUrl:base,checkPublicUrl:false});
+const noStable=await validateArticleForInstagram({...article,id:'not-a-stable-id',fingerprint:null,stableId:null},{siteUrl:base,checkPublicUrl:false});
 assert.equal(noStable.failureCode,'ARTICLE_MISSING_STABLE_ID');
 const unpublished=await validateArticleForInstagram({...article,sitePublishedAt:null},{siteUrl:base,checkPublicUrl:false});
 assert.equal(unpublished.failureCode,'ARTICLE_NOT_PUBLISHED');
