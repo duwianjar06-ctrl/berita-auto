@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const page=fs.readFileSync(new URL('../app/admin-instagram/page.jsx',import.meta.url),'utf8');
+const dashboard=fs.readFileSync(new URL('../app/admin-instagram/InstagramDashboard.jsx',import.meta.url),'utf8');
+const api=fs.readFileSync(new URL('../app/api/admin/instagram/status/route.js',import.meta.url),'utf8');
+const admin=fs.readFileSync(new URL('../app/admin-berita/page.jsx',import.meta.url),'utf8');
+const font=fs.readFileSync(new URL('../lib/social-fonts.js',import.meta.url),'utf8');
+const telemetry=fs.readFileSync(new URL('../lib/social-telemetry.js',import.meta.url),'utf8');
+const cron=fs.readFileSync(new URL('../app/api/cron/social-publish/route.js',import.meta.url),'utf8');
+assert.match(page,/auth\(\)/);assert.match(page,/ADMIN_EMAILS/);assert.match(page,/InstagramDashboard/);
+assert.match(admin,/href="\/admin-instagram"/);assert.match(admin,/Kelola Iklan/);assert.match(admin,/admin-actions\.css/);
+assert.match(api,/auth\(\)/);assert.match(api,/NextResponse\.json/);assert.doesNotMatch(api,/accessToken\s*:/);assert.doesNotMatch(api,/INSTAGRAM_ACCESS_TOKEN\s*:/);
+assert.match(dashboard,/INSTAGRAM_MIN_INTERVAL_MINUTES/);assert.match(dashboard,/Recent Trigger Runs/);assert.match(dashboard,/Riwayat Posting Instagram/);assert.match(dashboard,/Unsupported glyphs/);assert.match(dashboard,/Preview unavailable/);assert.match(dashboard,/20000/);
+assert.match(font,/NotoSans-Regular\.ttf/);assert.match(font,/NotoSans-Bold\.ttf/);assert.match(font,/fc-match/);assert.match(font,/fc-query/);
+assert.match(telemetry,/SOCIAL_RUN_INDEX/);assert.match(telemetry,/100/);assert.match(cron,/triggerSource:'vercel-cron'/);assert.match(cron,/recordSocialRun/);
+console.log('Admin Instagram regression: PASS auth, safe telemetry, cooldown, font diagnostics, history, scheduler route, responsive dashboard hooks');
