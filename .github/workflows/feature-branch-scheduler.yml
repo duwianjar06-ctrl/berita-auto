@@ -4,6 +4,8 @@ name: Feature News Scheduler
 on:
   schedule:
     - cron: "7,22,37,52 * * * *"
+    - cron: "2 * * * *"
+      timezone: "Asia/Jakarta"
   workflow_dispatch:
 
 permissions: {}
@@ -36,6 +38,48 @@ jobs:
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Accept: application/json" \
             "$PUBLICATION_URL")
+          curl_exit=$?
+          set -e
+
+          response=$(cat "$body_file")
+          rm -f "$body_file"
+
+          echo "HTTP_STATUS=${http_status}"
+          echo "$response"
+
+          if [[ "$curl_exit" -ne 0 ]]; then
+            echo "curl_exit=${curl_exit}"
+            exit "$curl_exit"
+          fi
+
+          if [[ "$http_status" -lt 200 || "$http_status" -ge 300 ]]; then
+            exit 1
+          fi
+
+  hourly-report:
+    if: github.event.schedule == '2 * * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Trigger hourly Telegram report endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          REPORT_URL: https://berita-auto.vercel.app/api/cron/telegram-hourly-report
+        run: |
+          if [[ -z "$CRON_SECRET" ]]; then
+            echo "CRON_SECRET is not configured; hourly Telegram report cannot trigger."
+            exit 1
+          fi
+
+          set +e
+          body_file=$(mktemp)
+          http_status=$(curl --silent --show-error \
+            --max-time 90 \
+            -o "$body_file" \
+            -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Accept: application/json" \
+            "$REPORT_URL")
           curl_exit=$?
           set -e
 
