@@ -2,37 +2,16 @@ import assert from 'node:assert/strict';
 import sharp from 'sharp';
 import {validateArticleForInstagram,validateSourceImage,prepareInstagramCandidate,finalRevalidatePreparedCandidate} from '../lib/social-preparation.js';
 import {readFileSync} from 'node:fs';
-
-const socialRun=readFileSync(new URL('./social-run.js',import.meta.url),'utf8');
-const admin=readFileSync(new URL('../lib/admin-instagram.js',import.meta.url),'utf8');
-const dashboard=readFileSync(new URL('../app/admin-instagram/InstagramDashboard.jsx',import.meta.url),'utf8');
-
+const socialRun=readFileSync(new URL('./social-run.js',import.meta.url),'utf8');const admin=readFileSync(new URL('../lib/admin-instagram.js',import.meta.url),'utf8');const dashboard=readFileSync(new URL('../app/admin-instagram/InstagramDashboard.jsx',import.meta.url),'utf8');
 const jpeg=await sharp({create:{width:1080,height:1350,channels:3,background:{r:40,g:60,b:80}}}).jpeg().toBuffer();
-function response({status=200,type='image/jpeg',body=jpeg,url='https://berita-auto.vercel.app/berita/test'}={}){return new Response(body,{status,headers:{'content-type':type,'x-social-card-render':'valid','x-social-card-text-length':'30'},});}
+function response({status=200,type='image/jpeg',body=jpeg}={}){return new Response(body,{status,headers:{'content-type':type,'x-social-card-render':'valid','x-social-card-text-length':'30'}});}
 const article={id:'a1',stableId:'a1',slug:'berita-test',title:'Judul berita yang valid',category:'Teknologi',publisher:'ANTARA',sitePublishedAt:'2026-08-16T12:00:00Z',sourcePublishedAt:'2026-08-16T11:50:00Z',sourceUrl:'https://example.com/berita-test',canonicalUrl:'https://berita-auto.vercel.app/berita/berita-test',imageUrl:'https://example.com/image.jpg',imageProvenance:'article_metadata',excerpt:'Ringkasan berita yang cukup panjang untuk social card.'};
-
-let calls=[];
-const validFetch=async(url)=>{calls.push(String(url));if(String(url).includes('/image.jpg'))return response();if(String(url).includes('/berita/'))return new Response('<html>ok</html>',{status:200,headers:{'content-type':'text/html'}});return response();};
-const articleCheck=await validateArticleForInstagram(article,{fetchImpl:validFetch});
-assert.equal(articleCheck.valid,true);assert.equal(articleCheck.publicStatus,'PASS');assert.equal(articleCheck.sourceUrl,article.sourceUrl);
-const imageCheck=await validateSourceImage(article,{fetchImpl:validFetch});
-assert.equal(imageCheck.status,'MATCHED_ARTICLE_METADATA');assert.equal(imageCheck.width,1080);assert.equal(imageCheck.height,1350);
-
-const htmlFetch=async()=>new Response('<html>not an image</html>',{status:200,headers:{'content-type':'text/html'}});
-const fallback=await validateSourceImage(article,{fetchImpl:htmlFetch});
-assert.equal(fallback.status,'FALLBACK_USED');assert.match(fallback.reason,/image_content_type/);
-
-const timeoutFetch=async(_url,{signal})=>await new Promise((resolve,reject)=>{signal.addEventListener('abort',()=>reject(Object.assign(new Error('aborted'),{name:'AbortError'})));});
-const timed=await validateSourceImage(article,{fetchImpl:timeoutFetch,timeoutMs:1});
-assert.equal(timed.status,'FALLBACK_USED');assert.equal(timed.reason,'image_timeout');
-
-const cardUrl='https://blob.vercel-storage.com/social/test.jpg';
-const prepared=await prepareInstagramCandidate({...article,cardUrls:[cardUrl],previewUrl:cardUrl,render:{status:'RENDER_SUCCESS',width:1080,height:1350,format:'jpeg',bytes:jpeg.length}}, {siteUrl:'https://berita-auto.vercel.app',full:false});
-assert.equal(prepared.preparationState,'READY');assert.equal(prepared.cardReady,true);assert.equal(prepared.captionStatus,'READY');assert.equal(prepared.dedupeStatus,'NOT_POSTED');assert.equal(prepared.imageValidationStatus,'MATCHED_ARTICLE_METADATA');
-const final=await finalRevalidatePreparedCandidate({...article,cardUrls:[cardUrl],state:'queued',preparationState:'READY'}, {siteUrl:'https://berita-auto.vercel.app'});
-assert.equal(final.valid,true);
-
-assert.match(socialRun,/prepareDuringCooldown/);assert.match(socialRun,/prepareInstagramCandidates/);assert.match(socialRun,/getPublishingUsage/);assert.ok(socialRun.indexOf('prepareDuringCooldown')<socialRun.indexOf('getPublishingUsage'),'cooldown preparation must precede Meta usage');
-assert.match(socialRun,/primaryCandidate/);assert.match(socialRun,/standbyCandidates/);assert.match(socialRun,/finalRevalidatePreparedCandidate/);assert.match(socialRun,/reason:'already_published'/);
-assert.match(admin,/preparationState/);assert.match(admin,/imageValidationStatus/);assert.match(admin,/imageRelationship/);assert.match(dashboard,/Card: READY/);
+let calls=[];const validFetch=async(url)=>{calls.push(String(url));if(String(url).includes('/image.jpg'))return response();if(String(url).includes('/berita/'))return new Response('<html>ok</html>',{status:200,headers:{'content-type':'text/html'}});return response();};
+const articleCheck=await validateArticleForInstagram(article,{fetchImpl:validFetch});assert.equal(articleCheck.valid,true);assert.equal(articleCheck.publicStatus,'PASS');assert.equal(articleCheck.sourceUrl,article.sourceUrl);
+const imageCheck=await validateSourceImage(article,{fetchImpl:validFetch});assert.equal(imageCheck.status,'MATCHED_ARTICLE_METADATA');assert.equal(imageCheck.width,1080);assert.equal(imageCheck.height,1350);
+const htmlFetch=async()=>new Response('<html>not an image</html>',{status:200,headers:{'content-type':'text/html'}});const fallback=await validateSourceImage(article,{fetchImpl:htmlFetch});assert.equal(fallback.status,'FALLBACK_USED');assert.match(fallback.reason,/image_content_type/);
+const timeoutFetch=async(_url,{signal})=>await new Promise((resolve,reject)=>{signal.addEventListener('abort',()=>reject(Object.assign(new Error('aborted'),{name:'AbortError'})));});const timed=await validateSourceImage(article,{fetchImpl:timeoutFetch,timeoutMs:1});assert.equal(timed.status,'FALLBACK_USED');assert.equal(timed.reason,'image_timeout');
+const cardUrl='https://blob.vercel-storage.com/social/test.jpg';const prepared=await prepareInstagramCandidate({...article,cardUrls:[cardUrl],previewUrl:cardUrl,render:{status:'RENDER_SUCCESS',width:1080,height:1350,format:'jpeg',bytes:jpeg.length}},{siteUrl:'https://berita-auto.vercel.app',full:false,fetchImpl:validFetch});assert.equal(prepared.preparationState,'READY');assert.equal(prepared.cardReady,true);assert.equal(prepared.captionStatus,'READY');assert.equal(prepared.dedupeStatus,'NOT_POSTED');assert.equal(prepared.imageValidationStatus,'MATCHED_ARTICLE_METADATA');
+const final=await finalRevalidatePreparedCandidate({article,cardUrls:[cardUrl],state:'queued',preparationState:'READY'},{siteUrl:'https://berita-auto.vercel.app',fetchImpl:validFetch});assert.equal(final.valid,true);
+assert.match(socialRun,/prepareDuringCooldown/);assert.match(socialRun,/prepareInstagramCandidates/);assert.match(socialRun,/getPublishingUsage/);assert.ok(socialRun.indexOf('prepareDuringCooldown')<socialRun.indexOf('getPublishingUsage'),'cooldown preparation must precede Meta usage');assert.match(socialRun,/primaryCandidate/);assert.match(socialRun,/standbyCandidates/);assert.match(socialRun,/finalRevalidatePreparedCandidate/);assert.match(socialRun,/reason:'already_published'/);assert.match(admin,/preparationState/);assert.match(admin,/imageValidationStatus/);assert.match(admin,/imageRelationship/);assert.match(dashboard,/Card: READY/);
 console.log('Instagram preparation regression: PASS article/public/image/card validation, fallback, primary/standby preparation, final revalidation, no Meta during cooldown');
