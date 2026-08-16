@@ -1,8 +1,13 @@
+import path from 'node:path';
 import sharp from 'sharp';
 import {readArticles} from '../../../../lib/storage.js';
 import {socialVisualProfile,socialCardText,buildSocialSlides} from '../../../../lib/social-visual.js';
 export const dynamic='force-dynamic';
 export const runtime='nodejs';
+
+const fontconfigDir=path.join(process.cwd(),'fontconfig');
+if(!process.env.FONTCONFIG_FILE)process.env.FONTCONFIG_FILE=path.join(fontconfigDir,'fonts.conf');
+if(!process.env.FONTCONFIG_PATH)process.env.FONTCONFIG_PATH=fontconfigDir;
 
 const text=value=>typeof value==='string'?value.trim():value==null?'':String(value).trim();
 const arr=value=>Array.isArray(value)?value:Array.isArray(value?.items)?value.items:Array.isArray(value?.values)?value.values:[];
