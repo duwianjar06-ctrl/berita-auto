@@ -4,18 +4,10 @@ import { instagramConfigured, instagramConfig, createMediaContainer, createCarou
 import { SOCIAL_LOCK_KEY, SOCIAL_LOCK_TTL, socialConfig, shouldSkipCooldown, shouldSkipDailyLimit, shouldSkipMetaBuffer, queueSocialArticle, readSocialQueue, readRecentPublished, selectBestSocialArticle, buildEligibleSocialQueue, deterministicCaption, getDailyPublishedCount, getLastPublishedAt, markSocialProcessing, markSocialFailure, markSocialPublished, incrementDailyPublishedCount } from '../lib/social.js';
 import { buildSocialSlides } from '../lib/social-visual.js';
 import { buildCarouselImageUrls } from '../lib/social-carousel.js';
+import { validateSocialCardUrl } from '../lib/social-card-validation.js';
 
-async function validatePublicImage(url) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 5000);
-  try {
-    const response = await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-64' }, signal: controller.signal, cache: 'no-store', redirect: 'follow' });
-    const type = String(response.headers.get('content-type') || '').toLowerCase();
-    if (!response.ok || !type.startsWith('image/')) throw new Error(`social_card_invalid_response_${response.status}_${type || 'missing_content_type'}`);
-    return true;
-  } catch (error) {
-    throw Object.assign(new Error(String(error?.message || error).slice(0, 200)), { kind: 'permanent' });
-  } finally { clearTimeout(timer); }
+async function validatePublicImage(url,expectedTextLength=0) {
+  return validateSocialCardUrl(url,{expectedTextLength});
 }
 
 function retryDelay(attempts) { return Math.min(30 * 60 * 1000, Math.max(60 * 1000, 2 ** Math.min(attempts, 5) * 60 * 1000)); }
@@ -24,12 +16,13 @@ export async function createCarouselChildren(urls, createChild=createMediaContai
   return Promise.all(urls.map(url => createChild({ imageUrl: url, isCarouselItem: true })));
 }
 
-async function createAndPublishMedia(article, caption, siteUrl) {
+export async function createAndPublishMedia(article, caption, siteUrl) {
   const started = Date.now();
   const slides = buildSocialSlides(article);
   const urls = buildCarouselImageUrls(siteUrl, article.id, slides.length);
+  if (!urls.length || urls.length > 2) throw new Error('social_card_invalid_slide_count');
   const validationStarted = Date.now();
-  await Promise.all(urls.map(validatePublicImage));
+  await Promise.all(urls.map((url,index) => validatePublicImage(url, buildSocialSlides(article)[index]?.summary?.length || buildSocialSlides(article)[index]?.title?.length || 0)));
   const imageValidationMs = Date.now() - validationStarted;
 
   if (slides.length === 1) {
