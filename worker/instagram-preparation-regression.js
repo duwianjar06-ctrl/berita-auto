@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
+import {randomBytes} from 'node:crypto';
 import {validateArticleForInstagram,validateSourceImage,prepareInstagramCandidate,finalRevalidatePreparedCandidate} from '../lib/social-preparation.js';
 import {readFileSync} from 'node:fs';
 const socialRun=readFileSync(new URL('./social-run.js',import.meta.url),'utf8');const admin=readFileSync(new URL('../lib/admin-instagram.js',import.meta.url),'utf8');const dashboard=readFileSync(new URL('../app/admin-instagram/InstagramDashboard.jsx',import.meta.url),'utf8');
-const jpeg=await sharp({create:{width:1080,height:1350,channels:3,background:{r:40,g:60,b:80}}}).jpeg().toBuffer();
+const jpeg=await sharp(randomBytes(1080*1350*3),{raw:{width:1080,height:1350,channels:3}}).jpeg({quality:86}).toBuffer();
 function response({status=200,type='image/jpeg',body=jpeg}={}){return new Response(body,{status,headers:{'content-type':type,'x-social-card-render':'valid','x-social-card-text-length':'30'}});}
 const article={id:'a1',stableId:'a1',slug:'berita-test',title:'Judul berita yang valid',category:'Teknologi',publisher:'ANTARA',sitePublishedAt:'2026-08-16T12:00:00Z',sourcePublishedAt:'2026-08-16T11:50:00Z',sourceUrl:'https://example.com/berita-test',canonicalUrl:'https://berita-auto.vercel.app/berita/berita-test',imageUrl:'https://example.com/image.jpg',imageProvenance:'article_metadata',excerpt:'Ringkasan berita yang cukup panjang untuk social card.'};
-let calls=[];const validFetch=async(url)=>{calls.push(String(url));if(String(url).includes('/image.jpg'))return response();if(String(url).includes('/berita/'))return new Response('<html>ok</html>',{status:200,headers:{'content-type':'text/html'}});return response();};
+const validFetch=async(url)=>{if(String(url).includes('/image.jpg'))return response();if(String(url).includes('/berita/'))return new Response('<html>ok</html>',{status:200,headers:{'content-type':'text/html'}});return response();};
 const articleCheck=await validateArticleForInstagram(article,{fetchImpl:validFetch});assert.equal(articleCheck.valid,true);assert.equal(articleCheck.publicStatus,'PASS');assert.equal(articleCheck.sourceUrl,article.sourceUrl);
 const imageCheck=await validateSourceImage(article,{fetchImpl:validFetch});assert.equal(imageCheck.status,'MATCHED_ARTICLE_METADATA');assert.equal(imageCheck.width,1080);assert.equal(imageCheck.height,1350);
 const htmlFetch=async()=>new Response('<html>not an image</html>',{status:200,headers:{'content-type':'text/html'}});const fallback=await validateSourceImage(article,{fetchImpl:htmlFetch});assert.equal(fallback.status,'FALLBACK_USED');assert.match(fallback.reason,/image_content_type/);
