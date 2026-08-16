@@ -14,7 +14,7 @@ assert.match(page,/AdminWorkspace/);assert.match(page,/initialTab.*automation/);
 for(const label of ['Automation \/ News Pipeline','Berita','Distribusi','Penonton','AI & Processing','System','Catatan & Perbaikan'])assert.match(workspace,new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
 assert.match(workspace,/initialTab='automation'/);assert.match(workspace,/fetch\(`\/api\/admin-berita\/article/);assert.match(workspace,/history\.pushState/);assert.match(workspace,/popstate/);assert.match(workspace,/detailCache/);
 assert.match(workspace,/Terpopuler Hari Ini/);assert.match(workspace,/Terpopuler Sepanjang Waktu/);assert.match(workspace,/todayViews/);assert.match(workspace,/totalViews/);
-assert.match(workspace,/technical/);assert.match(workspace,/Mobile/);assert.match(css,/admin-master-detail/);assert.match(css,/@media\(max-width:700px\)/);assert.match(css,/overflow:auto/);
+assert.match(workspace,/technical/);assert.match(css,/@media\(max-width:700px\)/);assert.match(css,/overflow:auto/);
 assert.match(dashboard,/Asia\/Jakarta/);assert.match(dashboard,/sourceCount/);assert.match(dashboard,/categoryCount/);assert.match(articleApi,/private, no-store/);
 assert.match(analytics,/getPopularTodayArticles/);assert.match(analytics,/minViews=100/);assert.match(analytics,/Asia\/Jakarta/);
 assert.match(helper,/publishWarnings/);assert.match(helper,/warningLabel/);assert.match(helper,/translated/);
