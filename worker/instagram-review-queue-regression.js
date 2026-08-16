@@ -1,10 +1,11 @@
-import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 const read=path=>readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 const prepareRoute=read('app/api/cron/social-prepare/route.js');
 const legacyRoute=read('app/api/cron/social-publish/route.js');
 const reviewLib=read('lib/instagram-review.js');
 const dashboard=read('app/admin-instagram/InstagramDashboard.jsx');
+const css=read('app/admin-instagram/admin-instagram.css');
 assert(!/createMediaContainer|publishMediaContainer|createAndPublishMedia/.test(prepareRoute),'prepare route must not call Meta publishing');
 assert(legacyRoute.includes("REVIEW_MODE==='review'"),'legacy scheduler route must respect review mode');
 assert(legacyRoute.includes('metaCalls:0'),'review scheduler must report zero Meta calls');
@@ -17,5 +18,6 @@ assert(dashboard.includes('PREVIEW — BELUM DIPOSTING'),'preview must not be co
 assert(dashboard.includes('Upload Instagram'),'manual upload action must be visible');
 assert(dashboard.includes('Edit Caption'),'caption editing must be visible');
 assert(dashboard.includes('Hapus'),'queue removal must be visible');
-assert(dashboard.includes('2000px')||dashboard.includes('430px'),'responsive mobile styling must exist');
+assert(css.includes('@media(max-width:430px)'),'responsive 430px styling must exist');
+assert(css.includes('@media(max-width:700px)'),'responsive 700px styling must exist');
 console.log('[instagram-review-queue] PASS');
