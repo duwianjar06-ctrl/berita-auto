@@ -25,7 +25,7 @@ assert.equal(repaired.publicStatus,'PASS');
 const missing=await validateArticleForInstagram({...article,id:null},{siteUrl:base,checkPublicUrl:false});
 assert.equal(missing.failureCode,'ARTICLE_MISSING_ID');
 const noStable=await validateArticleForInstagram({...article,id:'not-a-stable-id',fingerprint:null,stableId:null},{siteUrl:base,checkPublicUrl:false});
-assert.equal(noStable.failureCode,'ARTICLE_MISSING_STABLE_ID');
+assert.equal(noStable.failureCode,'CANONICAL_URL_MISSING');
 const unpublished=await validateArticleForInstagram({...article,sitePublishedAt:null},{siteUrl:base,checkPublicUrl:false});
 assert.equal(unpublished.failureCode,'ARTICLE_NOT_PUBLISHED');
 const notFound=await validateArticleForInstagram(article,{siteUrl:base,fetchImpl:async url=>new Response('not found',{status:404,headers:{'content-type':'text/html'},url:String(url)})});
