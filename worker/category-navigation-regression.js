@@ -32,6 +32,11 @@ test('zero-count categories remain available at the bottom',()=>{
   assert.deepEqual(ordered.slice(-3).map(item=>item.name),categories.slice(-3));
 });
 test('category routes use the shared canonical slug helper',()=>assert.equal(categoryRoute('Bencana & Cuaca'),'/kategori/bencana-&-cuaca'));
+test('important grouped category routes remain canonical',()=>{
+  assert.equal(categoryRoute('AI'),'/kategori/ai');
+  assert.equal(categoryRoute('Sepak Bola'),'/kategori/sepak-bola');
+  assert.equal(categoryRoute('Sains & Alam'),'/kategori/sains-&-alam');
+});
 test('no category is missing from the navigation model',()=>{
   const {ordered}=splitCategoryNavigation({},0);
   assert.deepEqual(ordered.map(item=>item.name),categories);
