@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import {formatProviderUsage,normalizeWarnings} from '../lib/admin-display.js';
 const page=await readFile(new URL('../app/admin-berita/page.jsx',import.meta.url),'utf8');
 const workspace=await readFile(new URL('../app/admin-berita/AdminWorkspace.jsx',import.meta.url),'utf8');
 const helper=await readFile(new URL('../lib/admin-processing.js',import.meta.url),'utf8');
@@ -15,8 +16,13 @@ for(const label of ['Automation \/ News Pipeline','Berita','Distribusi','Penonto
 assert.match(workspace,/initialTab='automation'/);assert.match(workspace,/fetch\(`\/api\/admin-berita\/article/);assert.match(workspace,/history\.pushState/);assert.match(workspace,/popstate/);assert.match(workspace,/detailCache/);
 assert.match(workspace,/Terpopuler Hari Ini/);assert.match(workspace,/Terpopuler Sepanjang Waktu/);assert.match(workspace,/todayViews/);assert.match(workspace,/totalViews/);
 assert.match(workspace,/technical/);assert.match(css,/@media\(max-width:700px\)/);assert.match(css,/overflow:auto/);
-assert.match(dashboard,/Asia\/Jakarta/);assert.match(dashboard,/sourceCount/);assert.match(dashboard,/categoryCount/);assert.match(articleApi,/private, no-store/);
+assert.match(dashboard,/Asia\/Jakarta/);assert.match(dashboard,/sourceCount/);assert.match(dashboard,/categoryCount/);assert.match(dashboard,/formatProviderUsage/);assert.match(articleApi,/private, no-store/);
 assert.match(analytics,/getPopularTodayArticles/);assert.match(analytics,/minViews=100/);assert.match(analytics,/Asia\/Jakarta/);
 assert.match(helper,/publishWarnings/);assert.match(helper,/warningLabel/);assert.match(helper,/translated/);
 assert.match(adsPage,/const blobConfigured=Boolean\(process\.env\.BLOB_READ_WRITE_TOKEN\)/);assert.match(adsPage,/Storage gambar belum dikonfigurasi/);assert.match(adsUpload,/blob_storage_not_configured/);assert.match(adsUpload,/status:503/);assert.match(manager,/blobConfigured/);assert.match(manager,/Storage gambar belum dikonfigurasi/);
-console.log('Admin UI regression: PASS tabs default automation client master-detail analytics popularity distribution mobile-safe Blob guard');
+assert.equal(formatProviderUsage({fallback:1}),'Fallback (1)');
+assert.equal(formatProviderUsage({gemini_secondary:1,groq:2,fallback:3}),'Gemini Secondary (1), Groq (2), Fallback (3)');
+assert.equal(formatProviderUsage(null),'—');
+assert.equal(formatProviderUsage({}),'—');
+assert.deepEqual(normalizeWarnings(['missing_image',{code:'image_fallback_used'},null]),['missing_image','image_fallback_used']);
+console.log('Admin UI regression: PASS tabs default automation client master-detail analytics popularity distribution mobile-safe Blob guard provider-object safety');
