@@ -7,7 +7,7 @@ const freshA=article('fresh-a','Berita baru A');
 const freshB=article('fresh-b','Berita baru B');
 const stale=article('stale','Berita lama gagal');
 const existing=[{queueId:'stale:q',articleId:'stale',status:'FAILED',failureCode:'CARD_PUBLIC_TIMEOUT',nextRetryAt:new Date(now+10*60000).toISOString()}];
-const queue=[{article:stale,articleId:'stale',state:'failed',nextRetryAt:new Date(now+10*60000).toISOString()}];
+const queue=[{article:stale,articleId:'stale',state:'failed'}];
 const pool=buildPreparationCandidatePool({articles:[freshA,freshB,stale],queue,existing,recentPublished:[],now});
 assert.equal(pool.diagnostics.skippedBackoff,1);
 assert.deepEqual(pool.freshCandidates.map(item=>item.article.id),['fresh-a','fresh-b']);
