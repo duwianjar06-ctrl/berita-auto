@@ -2,7 +2,7 @@
 
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {usePathname} from 'next/navigation';
-import {categorySlug,categories} from '../lib/categories.js';
+import {categoryRoute,splitCategoryNavigation} from '../lib/category-navigation.js';
 
 function getVisibleCount(width){
   if(width>=1280)return 8;
@@ -12,7 +12,7 @@ function getVisibleCount(width){
 }
 
 function isCategoryPath(pathname,category){
-  return pathname===`/kategori/${categorySlug(category)}`;
+  return pathname===categoryRoute(category);
 }
 
 export default function CategoryNav({counts={}}){
@@ -44,17 +44,11 @@ export default function CategoryNav({counts={}}){
     };
   },[open]);
 
-  const ordered=useMemo(()=>categories.map((name,index)=>({
-    name,
-    count:Number.isFinite(Number(counts[name]))?Number(counts[name]):0,
-    index,
-  })).sort((a,b)=>b.count-a.count||a.index-b.index||a.name.localeCompare(b.name)),[counts]);
-  const primary=ordered.slice(0,visibleCount);
-  const overflow=ordered.slice(visibleCount);
+  const {ordered,primary,overflow}=useMemo(()=>splitCategoryNavigation(counts,visibleCount),[counts,visibleCount]);
   const activeOverflow=overflow.some(item=>isCategoryPath(pathname,item.name));
 
   const go=()=>setOpen(false);
-  const categoryLink=(item,extra='')=><a className={`category-nav-link ${isCategoryPath(pathname,item.name)?'is-active ':''}${extra}`} href={`/kategori/${categorySlug(item.name)}`} onClick={go} aria-current={isCategoryPath(pathname,item.name)?'page':undefined}>{item.name}</a>;
+  const categoryLink=(item,extra='')=><a className={`category-nav-link ${isCategoryPath(pathname,item.name)?'is-active ':''}${extra}`} href={categoryRoute(item.name)} onClick={go} aria-current={isCategoryPath(pathname,item.name)?'page':undefined}>{item.name}</a>;
 
   return <nav ref={rootRef} className="category-nav" aria-label="Kategori berita">
     <div className="category-nav-desktop">
