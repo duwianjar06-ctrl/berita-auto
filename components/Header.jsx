@@ -1,5 +1,5 @@
 import {categories} from '../lib/categories.js';
-import {readPublicArticles} from '../lib/public-data.js';
+import {readPublicListArticles} from '../lib/public-data.js';
 import CategoryNav from './CategoryNav.jsx';
 
 function getPublishedCategoryCounts(items=[]){
@@ -13,7 +13,7 @@ function getPublishedCategoryCounts(items=[]){
 }
 
 export default async function Header({latestTitle='',counts=null}){
-  const categoryCounts=counts||getPublishedCategoryCounts(await readPublicArticles());
+  const categoryCounts=counts||getPublishedCategoryCounts(await readPublicListArticles());
   return <>
     <header className="site-header">
       <div className="header-inner">
