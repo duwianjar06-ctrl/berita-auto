@@ -1,11 +1,105 @@
 'use client';
-import {useRef} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {articlePath} from '../lib/article-url.js';
 import './story-carousel.css';
 
+const AUTO_ADVANCE_MS=500;
+const TRANSITION_MS=320;
+
 export default function StoryCarousel({articles=[]}){
-  const ref=useRef(null);
-  const move=(direction)=>ref.current?.scrollBy({left:direction*360,behavior:'smooth'});
-  if(!articles.length)return null;
-  return <section className="story-carousel" aria-label="Sorotan berita"><div className="story-carousel-head"><div><span className="category-eyebrow">SOROTAN</span><h2>Berita Pilihan</h2></div><div className="story-carousel-controls"><button type="button" onClick={()=>move(-1)} aria-label="Berita sebelumnya">←</button><button type="button" onClick={()=>move(1)} aria-label="Berita berikutnya">→</button></div></div><div className="story-carousel-track" ref={ref} tabIndex="0">{articles.slice(0,10).map(article=><a className="story-carousel-card" key={article.id} href={articlePath(article)}><div className="story-carousel-image">{article.imageUrl?<img src={article.imageUrl} alt="" width="500" height="330" loading="lazy"/>:<span>BA</span>}</div><div><span className="category-chip">{article.category||'Nasional'}</span><h3>{article.title}</h3><small>{article.sourceName||'Sumber publik'}</small></div></a>)}</div></section>;
+  const items=useMemo(()=>Array.isArray(articles)?articles.filter(a=>a?.id):[],[articles]);
+  const count=items.length;
+  const trackRef=useRef(null);
+  const touchStartX=useRef(null);
+  const [index,setIndex]=useState(count);
+  const [animate,setAnimate]=useState(true);
+  const [paused,setPaused]=useState(false);
+  const [hidden,setHidden]=useState(false);
+  const [cardStep,setCardStep]=useState(0);
+
+  useEffect(()=>{setIndex(count);},[count]);
+
+  useEffect(()=>{
+    const update=()=>{
+      const first=trackRef.current?.querySelector('.story-carousel-card');
+      if(!first)return;
+      const styles=getComputedStyle(trackRef.current);
+      const gap=parseFloat(styles.columnGap||styles.gap||'0')||0;
+      setCardStep(first.getBoundingClientRect().width+gap);
+    };
+    update();
+    const observer=typeof ResizeObserver!=='undefined'?new ResizeObserver(update):null;
+    if(observer&&trackRef.current)observer.observe(trackRef.current);
+    window.addEventListener('resize',update);
+    return()=>{observer?.disconnect();window.removeEventListener('resize',update)};
+  },[count]);
+
+  useEffect(()=>{
+    const onVisibility=()=>setHidden(document.hidden);
+    document.addEventListener('visibilitychange',onVisibility);
+    return()=>document.removeEventListener('visibilitychange',onVisibility);
+  },[]);
+
+  const advance=useCallback((direction=1)=>{
+    if(count<2)return;
+    setAnimate(true);
+    setIndex(value=>value+direction);
+    setPaused(true);
+    window.clearTimeout(advance.resumeTimer);
+    advance.resumeTimer=window.setTimeout(()=>setPaused(false),AUTO_ADVANCE_MS);
+  },[count]);
+
+  useEffect(()=>()=>window.clearTimeout(advance.resumeTimer),[advance]);
+
+  useEffect(()=>{
+    if(count<2||paused||hidden)return undefined;
+    if(typeof window.matchMedia==='function'&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return undefined;
+    const timer=window.setTimeout(()=>{
+      setAnimate(true);
+      setIndex(value=>value+1);
+    },AUTO_ADVANCE_MS);
+    return()=>window.clearTimeout(timer);
+  },[count,index,paused,hidden]);
+
+  const onTransitionEnd=()=>{
+    if(!count)return;
+    if(index>=count*2){setAnimate(false);setIndex(count);window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>setAnimate(true)));}
+    else if(index<=0){setAnimate(false);setIndex(count);window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>setAnimate(true)));}
+  };
+
+  const togglePaused=()=>setPaused(value=>!value);
+  const onKeyDown=event=>{
+    if(event.key==='ArrowLeft'){event.preventDefault();advance(-1)}
+    if(event.key==='ArrowRight'){event.preventDefault();advance(1)}
+    if(event.key===' '){event.preventDefault();togglePaused()}
+  };
+  const onTouchStart=event=>{touchStartX.current=event.changedTouches[0]?.clientX??null;setPaused(true)};
+  const onTouchEnd=event=>{
+    const start=touchStartX.current;touchStartX.current=null;
+    if(start==null)return;
+    const delta=(event.changedTouches[0]?.clientX??start)-start;
+    if(Math.abs(delta)>40)advance(delta<0?1:-1);else window.setTimeout(()=>setPaused(false),AUTO_ADVANCE_MS);
+  };
+  const slides=count?items.concat(items,items):[];
+  if(count<2)return null;
+  const transform=cardStep?`translate3d(${-index*cardStep}px,0,0)`:'translate3d(0,0,0)';
+  const isAutoPaused=paused||hidden;
+  return <section className="story-carousel" aria-label="Sorotan berita">
+    <div className="story-carousel-head">
+      <div><span className="category-eyebrow">SOROTAN</span><h2>Berita Pilihan</h2></div>
+      <div className="story-carousel-controls">
+        <button type="button" onClick={()=>advance(-1)} aria-label="Berita sebelumnya">←</button>
+        <button type="button" onClick={()=>advance(1)} aria-label="Berita berikutnya">→</button>
+        <button type="button" onClick={togglePaused} aria-label={isAutoPaused?'Putar otomatis':'Jeda otomatis'} aria-pressed={isAutoPaused}>{isAutoPaused?'▶':'Ⅱ'}</button>
+      </div>
+    </div>
+    <div className="story-carousel-viewport" onMouseEnter={()=>setPaused(true)} onMouseLeave={()=>setPaused(false)} onFocusCapture={()=>setPaused(true)} onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget))setPaused(false)}} onKeyDown={onKeyDown} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      <div ref={trackRef} className="story-carousel-track" style={{transform,transition:animate?`transform ${TRANSITION_MS}ms ease`:'none'}} onTransitionEnd={onTransitionEnd}>
+        {slides.map((article,slideIndex)=><a className="story-carousel-card" key={`${article.id}-${slideIndex}`} href={articlePath(article)} aria-hidden={slideIndex<count||slideIndex>=count*2?true:undefined} tabIndex={slideIndex>=count&&slideIndex<count*2?0:-1}>
+          <div className="story-carousel-image">{article.imageUrl?<img src={article.imageUrl} alt="" width="500" height="330" loading="lazy"/>:<span>BA</span>}</div>
+          <div><span className="category-chip">{article.category||'Nasional'}</span><h3>{article.title}</h3><small>{article.sourceName||article.publisher||'Sumber publik'}</small></div>
+        </a>)}
+      </div>
+    </div>
+  </section>;
 }

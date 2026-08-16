@@ -1,24 +1,19 @@
 import {categories} from '../lib/categories.js';
-import {readArticles} from '../lib/storage.js';
+import {readPublicArticles} from '../lib/public-data.js';
 import CategoryNav from './CategoryNav.jsx';
 
-async function getPublishedCategoryCounts(){
+function getPublishedCategoryCounts(items=[]){
   const counts=Object.fromEntries(categories.map(category=>[category,0]));
-  try{
-    const articles=await readArticles();
-    for(const article of articles){
-      if(!article?.sitePublishedAt&&!article?.publishedAt)continue;
-      const category=categories.find(name=>name.toLowerCase()===String(article.category||'').trim().toLowerCase());
-      if(category)counts[category]+=1;
-    }
-  }catch{
-    // Keep the public header usable if the aggregate source is temporarily unavailable.
+  for(const article of items){
+    if(!article?.sitePublishedAt&&!article?.publishedAt)continue;
+    const category=categories.find(name=>name.toLowerCase()===String(article.category||'').trim().toLowerCase());
+    if(category)counts[category]+=1;
   }
   return counts;
 }
 
-export default async function Header({latestTitle=''}){
-  const categoryCounts=await getPublishedCategoryCounts();
+export default async function Header({latestTitle='',counts=null}){
+  const categoryCounts=counts||getPublishedCategoryCounts(await readPublicArticles());
   return <>
     <header className="site-header">
       <div className="header-inner">
