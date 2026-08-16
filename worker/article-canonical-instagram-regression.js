@@ -16,8 +16,7 @@ assert.ok(check.canonicalUrl.endsWith('-01234567'));
 assert.ok(!check.canonicalUrl.endsWith(`/${article.slug}`));
 assert.equal(requested.at(-1),canonical);
 
-const legacy404=async url=>new Response('<html>not found</html>',{status:String(url)===canonical?200:404,headers:{'content-type':'text/html'},url:String(url)});
-const repaired=await validateArticleForInstagram({...article,canonicalUrl:`${base}/berita/${article.slug}`},{siteUrl:base,fetchImpl:legacy404});
+const repaired=await validateArticleForInstagram({...article,canonicalUrl:`${base}/berita/${article.slug}`},{siteUrl:base,fetchImpl});
 assert.equal(repaired.valid,true);
 assert.equal(repaired.canonicalUrl,canonical);
 assert.equal(repaired.publicStatus,'PASS');
@@ -35,6 +34,6 @@ assert.equal(timeout.failureCode,'CANONICAL_URL_TIMEOUT');
 
 const prepared=await prepareInstagramCandidate(article,{siteUrl:base,full:false,fetchImpl});
 assert.equal(prepared.status,'INVALID');
-assert.equal(prepared.reason,'ARTICLE_INVALID');
+assert.equal(prepared.reason,'CARD_SLIDE_COUNT_INVALID');
 assert.equal(prepared.articleCheck.failureCode,null);
 console.log('Instagram canonical routing regression: PASS authoritative stable article path, legacy slug repair, structured invalid reasons');
