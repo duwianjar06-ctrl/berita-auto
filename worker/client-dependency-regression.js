@@ -14,6 +14,8 @@ assert.equal(storyCarousel.includes("from '../lib/persistence.js'"),false,'Story
 assert.equal(persistence.includes('instagram-review-repair'),false,'persistence must not import review repair orchestration');
 assert.equal(persistence.includes('social-preparation'),false,'persistence must not import social preparation');
 assert.match(review,/export async function listInstagramReviewQueue\(\)/,'Instagram review queue reader must be defined in the review module');
-assert.match(review,/repairInstagramReviewQueue\(\{limit:5\}\)/,'review preparation must orchestrate bounded repair after the prepare lock');
+assert.match(review,/repairInstagramReviewQueue\(\{limit:5,now\}\)/,'review preparation must orchestrate bounded repair after the prepare lock');
+assert.match(review,/PREPARATION_ATTEMPT_BUDGET/,'review preparation must have a bounded candidate attempt budget');
+assert.match(review,/candidateAttempted/,'review preparation must expose candidate attempt diagnostics');
 
-console.log('client dependency regression: PASS pure article-url + isolated persistence + server-only Instagram repair boundary');
+console.log('client dependency regression: PASS pure article-url + isolated persistence + bounded Instagram repair/candidate orchestration');
