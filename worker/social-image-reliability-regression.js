@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {renderStateForRun,stageForRun,errorState,mediaIdMessage} from '../lib/social-telemetry.js';
+import {sanitizeCardText} from '../lib/social-visual.js';
+
+const route=readFileSync(new URL('../app/api/social-card/[articleId]/route.jsx',import.meta.url),'utf8');
+const socialRun=readFileSync(new URL('./social-run.js',import.meta.url),'utf8');
+const storage=readFileSync(new URL('../lib/social-card-storage.js',import.meta.url),'utf8');
+const social=readFileSync(new URL('../lib/social.js',import.meta.url),'utf8');
+
+assert.equal(renderStateForRun({status:'retry',reason:'instagram_timeout',render:{status:'RENDER_SUCCESS',bytes:12000}}),'RENDER_SUCCESS');
+assert.equal(renderStateForRun({status:'retry',reason:'instagram_timeout'},{cardUrls:['https://blob.test/card.jpg']}),'RENDER_SUCCESS');
+assert.equal(stageForRun({status:'retry',reason:'instagram_timeout',failureStage:'create_image'}),'META_CONTAINER_CREATE');
+assert.equal(stageForRun({status:'retry',reason:'instagram_timeout',failureStage:'publish_media'}),'META_PUBLISH');
+assert.equal(errorState({status:'retry',reason:'instagram_timeout'}).state,'ERROR');
+assert.equal(errorState({status:'published'}).state,'NO_ERROR');
+assert.equal(mediaIdMessage({stage:'META_CONTAINER_CREATE',reason:'instagram_timeout'}),'Belum tersedia — proses belum sampai tahap publish');
+assert.match(socialRun,/persistSocialCards/);
+assert.match(socialRun,/currentStage:'CARD_PERSIST'/);
+assert.match(socialRun,/cardUrls/);
+assert.match(socialRun,/cardFromItem/);
+assert.match(storage,/access:'public'/);
+assert.match(storage,/contentType:'image\/jpeg'/);
+assert.match(storage,/validateSocialCardBuffer/);
+assert.match(social,/previewUrl/);
+assert.match(social,/currentStage:'SUCCESS'/);
+assert.match(route,/const esc=/);
+assert.match(route,/&amp;/);
+assert.match(route,/&lt;/);
+assert.match(route,/&gt;/);
+const dangerous=sanitizeCardText('Presiden Ini "Hilang" & <tag> — Harga BBM… 👮‍♂️');
+assert.equal(dangerous.includes('<tag>'),false);
+assert.equal(dangerous.includes('👮'),false);
+console.log('social image reliability regression: PASS');

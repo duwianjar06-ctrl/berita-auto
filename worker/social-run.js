@@ -1,99 +1,124 @@
-import { readArticles } from '../lib/storage.js';
-import { persistenceConfigured, acquireLock, releaseLock, getJson, setJson } from '../lib/persistence.js';
-import { instagramConfigured, instagramConfig, createMediaContainer, createCarouselContainer, pollContainerReady, publishMediaContainer, getPublishingUsage, classifyInstagramError } from '../lib/instagram.js';
-import { SOCIAL_LOCK_KEY, SOCIAL_LOCK_TTL, socialConfig, shouldSkipCooldown, shouldSkipDailyLimit, shouldSkipMetaBuffer, queueSocialArticle, readSocialQueue, readRecentPublished, selectBestSocialArticle, buildEligibleSocialQueue, deterministicCaption, getDailyPublishedCount, getLastPublishedAt, markSocialProcessing, markSocialFailure, markSocialPublished, incrementDailyPublishedCount } from '../lib/social.js';
-import { buildSocialSlides } from '../lib/social-visual.js';
-import { buildCarouselImageUrls } from '../lib/social-carousel.js';
-import { validateSocialCardUrl } from '../lib/social-card-validation.js';
-import { getSocialFontDiagnostics } from '../lib/social-fonts.js';
+import {readArticles} from '../lib/storage.js';
+import {persistenceConfigured,acquireLock,releaseLock,getJson,setJson} from '../lib/persistence.js';
+import {instagramConfigured,instagramConfig,createMediaContainer,createCarouselContainer,pollContainerReady,publishMediaContainer,getPublishingUsage,classifyInstagramError} from '../lib/instagram.js';
+import {SOCIAL_LOCK_KEY,SOCIAL_LOCK_TTL,socialConfig,shouldSkipCooldown,shouldSkipDailyLimit,shouldSkipMetaBuffer,queueSocialArticle,readSocialQueue,readRecentPublished,selectBestSocialArticle,buildEligibleSocialQueue,deterministicCaption,getDailyPublishedCount,getLastPublishedAt,markSocialProcessing,markSocialFailure,markSocialPublished,incrementDailyPublishedCount} from '../lib/social.js';
+import {buildSocialSlides} from '../lib/social-visual.js';
+import {buildCarouselImageUrls} from '../lib/social-carousel.js';
+import {validateSocialCardUrl} from '../lib/social-card-validation.js';
+import {persistSocialCards} from '../lib/social-card-storage.js';
+import {getSocialFontDiagnostics} from '../lib/social-fonts.js';
 
-async function validatePublicImage(url,expectedTextLength=0) { return validateSocialCardUrl(url,{expectedTextLength}); }
-function retryDelay(attempts) { return Math.min(30 * 60 * 1000, Math.max(60 * 1000, 2 ** Math.min(attempts, 5) * 60 * 1000)); }
-export async function createCarouselChildren(urls, createChild=createMediaContainer) { return Promise.all(urls.map(url => createChild({ imageUrl: url, isCarouselItem: true }))); }
+async function validatePublicImage(url,expectedTextLength=0){return validateSocialCardUrl(url,{expectedTextLength});}
+function retryDelay(attempts){return Math.min(30*60*1000,Math.max(60*1000,2**Math.min(attempts,5)*60*1000));}
+export async function createCarouselChildren(urls,createChild=createMediaContainer){return Promise.all(urls.map(url=>createChild({imageUrl:url,isCarouselItem:true})));}
 
-export async function createAndPublishMedia(article, caption, siteUrl) {
-  const started = Date.now();
-  const slides = buildSocialSlides(article);
-  const urls = buildCarouselImageUrls(siteUrl, article.id, slides.length);
-  if (!urls.length || urls.length > 2) throw new Error('social_card_invalid_slide_count');
-  const validationStarted = Date.now();
-  const validations = await Promise.all(urls.map((url,index) => validatePublicImage(url, slides[index]?.summary?.length || slides[index]?.title?.length || 0)));
-  const imageValidationMs = Date.now() - validationStarted;
-  const render = {status:'RENDER_SUCCESS',width:1080,height:1350,format:'jpeg',bytes:validations[0]?.bytes||null,durationMs:validations.reduce((sum,item)=>sum+Number(item?.durationMs||0),0)};
+export async function prepareSocialCards(article,siteUrl,runId){
+  const slides=buildSocialSlides(article);
+  const sourceUrls=buildCarouselImageUrls(siteUrl,article.id,slides.length);
+  if(!sourceUrls.length||sourceUrls.length>2)throw Object.assign(new Error('social_card_invalid_slide_count'),{failureStage:'SOCIAL_CARD_RENDER',permanent:true});
+  const validationStarted=Date.now();
+  const validations=await Promise.all(sourceUrls.map((url,index)=>validatePublicImage(url,slides[index]?.summary?.length||slides[index]?.title?.length||0)));
+  const render={status:'RENDER_SUCCESS',completedAt:new Date().toISOString(),width:1080,height:1350,format:'jpeg',bytes:Math.max(...validations.map(item=>Number(item?.bytes||0))),durationMs:validations.reduce((sum,item)=>sum+Number(item?.durationMs||0),0),slideCount:sourceUrls.length,renderMode:'primary',validationMs:Date.now()-validationStarted};
+  const cards=await persistSocialCards(sourceUrls,{articleId:article.id,runId});
+  return{sourceCardUrls:sourceUrls,cardUrls:cards.map(card=>card.url),cardMeta:cards,render};
+}
 
-  if (slides.length === 1) {
-    const containerStarted = Date.now();
-    const containerId = await createMediaContainer({ imageUrl: urls[0], caption });
-    const ready = await pollContainerReady(containerId);
-    const containerMs = Date.now() - containerStarted;
-    if (!ready.ready) return { ready, containerId, cardUrls:urls, render, stage:'WAITING_CONTAINER', perf: { imageValidationMs, containerMs, publishMs: 0, totalMediaMs: Date.now() - started } };
-    const publishStarted = Date.now();
-    const mediaId = await publishMediaContainer(containerId);
-    return { ready, containerId, mediaId, cardUrls:urls, render, stage:'SUCCESS', carousel: false, perf: { imageValidationMs, containerMs, publishMs: Date.now() - publishStarted, totalMediaMs: Date.now() - started } };
+export async function createAndPublishMedia(article,caption,cardUrls){
+  const started=Date.now();
+  const urls=Array.isArray(cardUrls)?cardUrls.filter(Boolean):[];
+  if(!urls.length||urls.length>2)throw Object.assign(new Error('social_card_invalid_persisted_urls'),{failureStage:'CARD_PERSIST',permanent:true});
+  if(urls.length===1){
+    const containerStarted=Date.now();
+    const containerId=await createMediaContainer({imageUrl:urls[0],caption});
+    const ready=await pollContainerReady(containerId);
+    const containerMs=Date.now()-containerStarted;
+    if(!ready.ready)return{ready,containerId,cardUrls:urls,stage:'WAITING_CONTAINER',failureStage:'META_CONTAINER_STATUS',perf:{containerMs,publishMs:0,totalMediaMs:Date.now()-started}};
+    const publishStarted=Date.now();
+    const mediaId=await publishMediaContainer(containerId);
+    return{ready,containerId,mediaId,cardUrls:urls,stage:'SUCCESS',carousel:false,failureStage:null,perf:{containerMs,publishMs:Date.now()-publishStarted,totalMediaMs:Date.now()-started}};
   }
-
-  const containerStarted = Date.now();
-  const childIds = await createCarouselChildren(urls);
-  const childReadiness = await Promise.all(childIds.map(childId => pollContainerReady(childId)));
-  const failedChild = childReadiness.find(result => !result.ready);
-  if (failedChild) return { ready: failedChild, childIds, cardUrls:urls, render, stage:'WAITING_CONTAINER', carousel: true, perf: { imageValidationMs, containerMs: Date.now() - containerStarted, publishMs: 0, totalMediaMs: Date.now() - started } };
-  const containerId = await createCarouselContainer({ children: childIds, caption });
-  const ready = await pollContainerReady(containerId);
-  const containerMs = Date.now() - containerStarted;
-  if (!ready.ready) return { ready, containerId, childIds, cardUrls:urls, render, stage:'WAITING_CONTAINER', carousel: true, perf: { imageValidationMs, containerMs, publishMs: 0, totalMediaMs: Date.now() - started } };
-  const publishStarted = Date.now();
-  const mediaId = await publishMediaContainer(containerId);
-  return { ready, containerId, childIds, mediaId, cardUrls:urls, render, stage:'SUCCESS', carousel: true, perf: { imageValidationMs, containerMs, publishMs: Date.now() - publishStarted, totalMediaMs: Date.now() - started } };
+  const containerStarted=Date.now();
+  const childIds=await createCarouselChildren(urls);
+  const childReadiness=await Promise.all(childIds.map(childId=>pollContainerReady(childId)));
+  const failedChild=childReadiness.find(result=>!result.ready);
+  if(failedChild)return{ready:failedChild,childIds,cardUrls:urls,stage:'WAITING_CONTAINER',failureStage:'META_CONTAINER_STATUS',carousel:true,perf:{containerMs:Date.now()-containerStarted,publishMs:0,totalMediaMs:Date.now()-started}};
+  const containerId=await createCarouselContainer({children:childIds,caption});
+  const ready=await pollContainerReady(containerId);
+  const containerMs=Date.now()-containerStarted;
+  if(!ready.ready)return{ready,containerId,childIds,cardUrls:urls,stage:'WAITING_CONTAINER',failureStage:'META_CONTAINER_STATUS',carousel:true,perf:{containerMs,publishMs:0,totalMediaMs:Date.now()-started}};
+  const publishStarted=Date.now();
+  const mediaId=await publishMediaContainer(containerId);
+  return{ready,containerId,childIds,mediaId,cardUrls:urls,stage:'SUCCESS',carousel:true,failureStage:null,perf:{containerMs,publishMs:Date.now()-publishStarted,totalMediaMs:Date.now()-started}};
 }
 
-export async function runSocialCycle({ trigger = 'manual', now = Date.now() } = {}) {
-  const cycleStarted = Date.now();
-  if (!instagramConfig().enabled) return { status: 'skipped', reason: 'disabled', durationMs: Date.now() - cycleStarted };
-  if (!instagramConfigured()) return { status: 'skipped', reason: 'missing_configuration', durationMs: Date.now() - cycleStarted };
-  if (!persistenceConfigured()) return { status: 'skipped', reason: 'persistence_not_configured', durationMs: Date.now() - cycleStarted };
-  const lockToken = `${trigger}:${process.pid}:${now}`;
-  if (!(await acquireLock(SOCIAL_LOCK_KEY, lockToken, SOCIAL_LOCK_TTL))) { console.log('[social] skipped reason=lock_busy'); return { status: 'skipped', reason: 'lock_busy', durationMs: Date.now() - cycleStarted }; }
-  try {
-    const cfg = socialConfig();
-    const last = await getLastPublishedAt();
-    if (shouldSkipCooldown(last, now, cfg.minIntervalMinutes)) { console.log('[social] skipped reason=cooldown'); return { status: 'skipped', reason: 'cooldown', durationMs: Date.now() - cycleStarted }; }
-    const daily = await getDailyPublishedCount(now);
-    if (shouldSkipDailyLimit(daily, cfg.maxPostsPerDay)) return { status: 'skipped', reason: 'daily_limit', publishedToday: daily, durationMs: Date.now() - cycleStarted };
-    const queueStarted = Date.now(); let queue = await readSocialQueue(100); let fallbackReconciled = 0;
-    if (!queue.length) { const articles = await readArticles(); const candidates = articles.filter(article => article?.id && article?.sitePublishedAt).slice(0, 20); await Promise.allSettled(candidates.map(article => queueSocialArticle(article))); fallbackReconciled = candidates.length; queue = await readSocialQueue(20); }
-    const queueReadMs = Date.now() - queueStarted; const eligible = buildEligibleSocialQueue(queue);
-    if (!eligible.length) return { status: 'skipped', reason: 'queue_empty', queueReadMs, fallbackReconciled, durationMs: Date.now() - cycleStarted };
-    const metaStarted = Date.now(); const usage = await getPublishingUsage(); const metaLimitMs = Date.now() - metaStarted;
-    if (shouldSkipMetaBuffer(usage, cfg.limitBuffer)) return { status: 'skipped', reason: 'meta_limit_buffer', remaining: usage.remaining, queueReadMs, metaLimitMs, durationMs: Date.now() - cycleStarted };
-    const recent = await readRecentPublished(20); const selected = selectBestSocialArticle(eligible, { now, recentPublished: recent });
-    if (!selected) return { status: 'skipped', reason: 'no_worthy_content', queueReadMs, metaLimitMs, durationMs: Date.now() - cycleStarted };
-    const publishedState = await getJson(`ba:social:instagram:published:${selected.articleId}`);
-    if (publishedState) return { status: 'skipped', reason: 'already_published', articleId: selected.articleId, queueReadMs, metaLimitMs, durationMs: Date.now() - cycleStarted };
-    const processing = await markSocialProcessing(selected); const article = selected.article;
-    try {
-      const font = getSocialFontDiagnostics(`${article?.title||''} ${article?.publisher||article?.sourceName||''}`);
-      const caption = deterministicCaption(article, instagramConfig().siteUrl);
-      const result = await createAndPublishMedia(article, caption, instagramConfig().siteUrl);
-      processing.containerId = result.containerId; processing.carousel = Boolean(result.carousel); processing.childContainerIds = result.childIds || []; processing.cardUrls = result.cardUrls || []; processing.render = result.render || null; processing.font = font; processing.glyph = {unsupportedGlyphs:font.unsupportedGlyphs,validationStatus:font.unsupportedGlyphs===null?'UNKNOWN_LEGACY':font.unsupportedGlyphs===0?'PASS':'WARNING'}; processing.updatedAt = new Date().toISOString();
-      await setJson(`ba:social:instagram:item:${processing.articleId}`, { ...processing });
-      if (!result.ready.ready) {
-        const err = result.ready.permanent ? new Error('instagram_media_processing_failed') : new Error('instagram_media_processing_pending');
-        if (result.ready.permanent) { await markSocialFailure(processing, err, { permanent: true }); return { status: 'skipped', reason: 'media_processing_failed', articleId:article.id, cardUrls:processing.cardUrls, render:processing.render, font, queueReadMs, metaLimitMs, durationMs: Date.now() - cycleStarted }; }
-        await markSocialFailure(processing, err, { retryAfterMs: retryDelay(processing.attempts) });
-        const failedItem=await getJson(`ba:social:instagram:item:${processing.articleId}`);
-        return { status: 'retry', reason: 'media_processing_pending', articleId:article.id, cardUrls:processing.cardUrls, render:processing.render, font, failureStage:'WAITING_CONTAINER', retryable:true, attempt:failedItem?.attempts||processing.attempts, nextRetryAt:failedItem?.nextRetryAt, queueReadMs, metaLimitMs, durationMs: Date.now() - cycleStarted };
+function cardFromItem(item){return Array.isArray(item?.cardUrls)&&item.cardUrls.length?item.cardUrls:null;}
+function errorPayload(error,classification){return{status:Number(error?.status||0)||null,metaCode:Number(classification?.metaCode||error?.metaCode||0)||null,reason:classification?.reason||'instagram_request_failed',failureStage:error?.instagramOperation||null,retryable:classification?.kind==='transient',ambiguous:classification?.kind==='ambiguous'};}
+
+export async function runSocialCycle({trigger='manual',now=Date.now()}={}){
+  const cycleStarted=Date.now();
+  if(!instagramConfig().enabled)return{status:'skipped',reason:'disabled',durationMs:Date.now()-cycleStarted};
+  if(!instagramConfigured())return{status:'skipped',reason:'missing_configuration',durationMs:Date.now()-cycleStarted};
+  if(!persistenceConfigured())return{status:'skipped',reason:'persistence_not_configured',durationMs:Date.now()-cycleStarted};
+  const lockToken=`${trigger}:${process.pid}:${now}`;
+  if(!(await acquireLock(SOCIAL_LOCK_KEY,lockToken,SOCIAL_LOCK_TTL)))return{status:'skipped',reason:'lock_busy',durationMs:Date.now()-cycleStarted};
+  try{
+    const cfg=socialConfig();
+    const last=await getLastPublishedAt();
+    if(shouldSkipCooldown(last,now,cfg.minIntervalMinutes))return{status:'skipped',reason:'cooldown',durationMs:Date.now()-cycleStarted};
+    const daily=await getDailyPublishedCount(now);
+    if(shouldSkipDailyLimit(daily,cfg.maxPostsPerDay))return{status:'skipped',reason:'daily_limit',publishedToday:daily,durationMs:Date.now()-cycleStarted};
+    const queueStarted=Date.now();let queue=await readSocialQueue(100);let fallbackReconciled=0;
+    if(!queue.length){const articles=await readArticles();const candidates=articles.filter(article=>article?.id&&article?.sitePublishedAt).slice(0,20);await Promise.allSettled(candidates.map(article=>queueSocialArticle(article)));fallbackReconciled=candidates.length;queue=await readSocialQueue(20);}
+    const queueReadMs=Date.now()-queueStarted;const eligible=buildEligibleSocialQueue(queue);
+    if(!eligible.length)return{status:'skipped',reason:'queue_empty',queueReadMs,fallbackReconciled,durationMs:Date.now()-cycleStarted};
+    const metaStarted=Date.now();const usage=await getPublishingUsage();const metaLimitMs=Date.now()-metaStarted;
+    if(shouldSkipMetaBuffer(usage,cfg.limitBuffer))return{status:'skipped',reason:'meta_limit_buffer',remaining:usage.remaining,queueReadMs,metaLimitMs,durationMs:Date.now()-cycleStarted};
+    const recent=await readRecentPublished(20);const selected=selectBestSocialArticle(eligible,{now,recentPublished:recent});
+    if(!selected)return{status:'skipped',reason:'no_worthy_content',queueReadMs,metaLimitMs,durationMs:Date.now()-cycleStarted};
+    const publishedState=await getJson(`ba:social:instagram:published:${selected.articleId}`);
+    if(publishedState)return{status:'skipped',reason:'already_published',articleId:selected.articleId,queueReadMs,metaLimitMs,durationMs:Date.now()-cycleStarted};
+    let processing=await markSocialProcessing(selected);const article=selected.article;
+    let font=null;
+    try{
+      font=getSocialFontDiagnostics(`${article?.title||''} ${article?.publisher||article?.sourceName||''}`);
+      const caption=deterministicCaption(article,instagramConfig().siteUrl);
+      let cards=cardFromItem(processing);
+      let render=processing.render||null;
+      let sourceCardUrls=processing.sourceCardUrls||[];
+      if(!cards){
+        const prepared=await prepareSocialCards(article,instagramConfig().siteUrl,`attempt-${processing.attempts}-${Date.now()}`);
+        cards=prepared.cardUrls;sourceCardUrls=prepared.sourceCardUrls;render=prepared.render;
+        processing={...processing,sourceCardUrls,cardUrls:cards,previewUrl:cards[0]||null,cardMeta:prepared.cardMeta,render,font,glyph:{unsupportedGlyphs:font.unsupportedGlyphs,validationStatus:font.unsupportedGlyphs===null?'UNKNOWN_LEGACY':font.unsupportedGlyphs===0?'PASS':'WARNING'},currentStage:'CARD_PERSIST',updatedAt:new Date().toISOString()};
+        await setJson(`ba:social:instagram:item:${processing.articleId}`,processing);
       }
-      const mediaId = result.mediaId; const publishedAt = new Date().toISOString(); let record = null; let persistenceError = null;
-      for (let attempt = 1; attempt <= 3; attempt++) { try { record = await markSocialPublished(processing, { mediaId, publishedAt }); break; } catch (error) { persistenceError = error; if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 500 * attempt)); } }
-      if (!record) return { status: 'persist_error', articleId: article.id, mediaId, cardUrls:processing.cardUrls, render:processing.render, font, queueReadMs, metaLimitMs, durationMs: Date.now() - cycleStarted };
-      let publishedToday = daily + 1; try { publishedToday = await incrementDailyPublishedCount(now); } catch {}
-      const perf = result.perf || {}; return { status: 'published', articleId: article.id, slug: article.slug, mediaId, publishedAt, carousel: Boolean(result.carousel), slideCount: buildSocialSlides(article).length, queueRemaining: Math.max(0, eligible.length - 1), publishedToday, record, cardUrls:processing.cardUrls, render:processing.render, font, glyph:processing.glyph, perf: { queueReadMs, metaLimitMs, imageValidationMs: perf.imageValidationMs || 0, containerMs: perf.containerMs || 0, publishMs: perf.publishMs || 0, totalMs: Date.now() - cycleStarted } };
-    } catch (error) {
-      const classification = classifyInstagramError(error); const permanent = classification.kind === 'permanent'; const ambiguous = classification.kind === 'ambiguous' || classification.reason === 'instagram_publish_ambiguous';
-      await markSocialFailure(processing, error, { permanent, ambiguous, retryAfterMs: retryDelay(processing.attempts) });
-      const failedItem=await getJson(`ba:social:instagram:item:${processing.articleId}`); const safeStatus=Number(error?.status||0)||null; const safeMetaCode=Number(classification.metaCode||error?.metaCode||0)||null; const retryable=!permanent&&!ambiguous;
-      return { status: ambiguous || permanent ? 'failed' : 'retry', articleId: article.id, reason: classification.reason, failureStage:error?.instagramOperation||null, httpStatus:safeStatus, metaCode:safeMetaCode, retryable, attempt:failedItem?.attempts||processing.attempts, nextRetryAt:failedItem?.nextRetryAt||null, cardUrls:failedItem?.cardUrls||processing.cardUrls||[], render:failedItem?.render||processing.render||null, font:failedItem?.font||processing.font||null, glyph:failedItem?.glyph||processing.glyph||null, queueReadMs, metaLimitMs, durationMs: Date.now() - cycleStarted };
+      const result=await createAndPublishMedia(article,caption,cards);
+      processing={...processing,containerId:result.containerId||processing.containerId,carousel:Boolean(result.carousel),childContainerIds:result.childIds||processing.childContainerIds||[],cardUrls:result.cardUrls||cards,previewUrl:(result.cardUrls||cards)[0]||null,currentStage:result.stage||'PUBLISHING',updatedAt:new Date().toISOString()};
+      await setJson(`ba:social:instagram:item:${processing.articleId}`,processing);
+      if(!result.ready.ready){
+        const err=result.ready.permanent?new Error('instagram_media_processing_failed'):new Error('instagram_media_processing_pending');
+        err.instagramOperation='poll_container';
+        if(result.ready.permanent){await markSocialFailure(processing,err,{permanent:true});return{status:'skipped',reason:'media_processing_failed',articleId:article.id,cardUrls:processing.cardUrls,render:processing.render,font,failureStage:'META_CONTAINER_STATUS',queueReadMs,metaLimitMs,durationMs:Date.now()-cycleStarted};}
+        await markSocialFailure(processing,err,{retryAfterMs:retryDelay(processing.attempts)});
+        const failedItem=await getJson(`ba:social:instagram:item:${processing.articleId}`);
+        return{status:'retry',reason:'media_processing_pending',articleId:article.id,cardUrls:failedItem?.cardUrls||cards,render:failedItem?.render||render,font,failureStage:'META_CONTAINER_STATUS',retryable:true,attempt:failedItem?.attempts||processing.attempts,nextRetryAt:failedItem?.nextRetryAt,queueReadMs,metaLimitMs,durationMs:Date.now()-cycleStarted};
+      }
+      const mediaId=result.mediaId;const publishedAt=new Date().toISOString();let record=null;
+      for(let attempt=1;attempt<=3;attempt++){try{record=await markSocialPublished(processing,{mediaId,publishedAt});break;}catch(error){if(attempt<3)await new Promise(resolve=>setTimeout(resolve,500*attempt));}}
+      if(!record)return{status:'persist_error',articleId:article.id,mediaId,cardUrls:processing.cardUrls,render:processing.render,font,queueReadMs,metaLimitMs,durationMs:Date.now()-cycleStarted};
+      let publishedToday=daily+1;try{publishedToday=await incrementDailyPublishedCount(now);}catch{}
+      const perf=result.perf||{};
+      return{status:'published',articleId:article.id,slug:article.slug,mediaId,publishedAt,carousel:Boolean(result.carousel),slideCount:buildSocialSlides(article).length,queueRemaining:Math.max(0,eligible.length-1),publishedToday,record,cardUrls:processing.cardUrls,render:processing.render,font,glyph:processing.glyph,perf:{queueReadMs,metaLimitMs,containerMs:perf.containerMs||0,publishMs:perf.publishMs||0,totalMs:Date.now()-cycleStarted}};
+    }catch(error){
+      const classification=classifyInstagramError(error);
+      const permanent=classification.kind==='permanent'||Boolean(error?.permanent);
+      const ambiguous=classification.kind==='ambiguous'||classification.reason==='instagram_publish_ambiguous';
+      const payload=errorPayload(error,classification);
+      const persistedItem=await getJson(`ba:social:instagram:item:${processing.articleId}`);
+      const current={...processing,...(persistedItem||{})};
+      await markSocialFailure(current,error,{permanent,ambiguous,retryAfterMs:retryDelay(current.attempts)});
+      const failedItem=await getJson(`ba:social:instagram:item:${processing.articleId}`);
+      return{status:ambiguous||permanent?'failed':'retry',articleId:article.id,reason:payload.reason,failureStage:payload.failureStage||error?.failureStage||'UNKNOWN',httpStatus:payload.status,metaCode:payload.metaCode,retryable:!permanent&&!ambiguous,attempt:failedItem?.attempts||current.attempts,nextRetryAt:failedItem?.nextRetryAt||null,cardUrls:failedItem?.cardUrls||current.cardUrls||[],render:failedItem?.render||current.render||null,font:failedItem?.font||font,glyph:failedItem?.glyph||current.glyph||null,queueReadMs,metaLimitMs,durationMs:Date.now()-cycleStarted};
     }
-  } finally { await releaseLock(SOCIAL_LOCK_KEY, lockToken).catch(() => {}); }
+  }finally{await releaseLock(SOCIAL_LOCK_KEY,lockToken).catch(()=>{});}
 }
-if (process.argv[1]?.endsWith('/worker/social-run.js')) { runSocialCycle({ trigger: 'cli' }).then(result => console.log(JSON.stringify(result))).catch(error => { console.error(`[social] fatal ${String(error?.message || error).slice(0, 240)}`); process.exitCode = 1; }); }
+if(process.argv[1]?.endsWith('/worker/social-run.js'))runSocialCycle({trigger:'cli'}).then(result=>console.log(JSON.stringify(result))).catch(error=>{console.error(`[social] fatal ${String(error?.message||error).slice(0,240)}`);process.exitCode=1;});
