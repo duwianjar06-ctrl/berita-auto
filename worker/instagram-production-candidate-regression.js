@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {buildPreparationCandidatePool} from '../lib/instagram-preparation-runtime.js';
+import {orderPreparationCandidates} from '../lib/instagram-preparation-candidate-order.js';
 
 const runtime=await readFile(new URL('../lib/instagram-preparation-runtime.js',import.meta.url),'utf8');
 const now=Date.parse('2026-08-17T00:00:00Z');
@@ -22,6 +23,10 @@ const freshQueue=tenFailed.map(row=>({article:article(row.articleId,row.articleI
 const fair=buildPreparationCandidatePool({articles:[...fresh,...freshQueue.map(x=>x.article)],queue:freshQueue,existing:tenFailed,recentPublished:[],now});
 assert.equal(fair.existingCandidates.length,10,'pool exposes old failures; runtime must cap retry slots');
 assert.ok(fair.freshCandidates.length>=6,'fresh candidates remain available');
+const fairPool=orderPreparationCandidates({freshCandidates:fair.freshCandidates,failedCandidates:fair.existingCandidates,maxAttempts:10,maxFailedRetries:2});
+assert.equal(fairPool.length,10);
+assert.equal(fairPool.filter(item=>item.state==='failed').length,2);
+assert.equal(fairPool.filter(item=>item.state==='queued').length,8);
 
 const backoffA={queueId:'backoff-a:q',articleId:'backoff-a',status:'FAILED',failureCode:'CARD_PUBLIC_TIMEOUT',nextRetryAt:new Date(now+5*60000).toISOString()};
 const backoffArticle=article('backoff-a','Backoff A');
@@ -36,8 +41,18 @@ const repairedPool=buildPreparationCandidatePool({articles:[sameArticle],queue:[
 assert.equal(repairedPool.existingCandidates[0].prior.queueId,'same:q');
 assert.equal(repairedPool.existingCandidates[0].prior.cardUrls.length,2);
 
+const simulated=[
+  {article:{id:'A'},state:'failed'},
+  {article:{id:'B'},state:'failed'},
+  {article:{id:'C'},state:'queued'},
+  {article:{id:'D'},state:'queued'}
+];
+const outcomes=new Map([['A','FAIL'],['B','FAIL'],['C','READY'],['D','READY']]);
+let attempted=0;let readyCreated=0;const failedIds=[];for(const candidate of simulated){attempted++;try{if(outcomes.get(candidate.article.id)==='FAIL')throw new Error('recoverable');if(outcomes.get(candidate.article.id)==='READY')readyCreated++;}catch(error){failedIds.push(candidate.article.id);continue;}if(readyCreated>=2)break;}
+assert.equal(attempted,4);assert.equal(readyCreated,2);assert.deepEqual(failedIds,['A','B']);
+
 assert.match(runtime,/MAX_FAILED_RETRIES_PER_RUN=2/);
-assert.match(runtime,/candidatePool=\[\.\.\.fresh,\.\.\.old\]/);
+assert.match(runtime,/orderPreparationCandidates/);
 assert.match(runtime,/for\(let i=0;i<candidatePool\.length/);
 assert.match(runtime,/catch\(error\)/);
 assert.match(runtime,/diagnostics\.candidateFailed\+\+/);
