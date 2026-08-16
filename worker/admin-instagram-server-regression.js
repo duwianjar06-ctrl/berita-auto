@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {getInstagramReviewSnapshot,listInstagramReviewQueue} from '../lib/instagram-review.js';
+import {getInstagramReviewSnapshot} from '../lib/instagram-review.js';
 
 const page=await readFile(new URL('../app/admin-instagram/page.jsx',import.meta.url),'utf8');
 
-assert.equal(typeof listInstagramReviewQueue,'function','Instagram review queue reader must resolve as a callable dependency');
+assert.equal(typeof globalThis.listInstagramReviewQueue,'function','Instagram review queue reader must resolve as a callable server dependency');
 const snapshot=await getInstagramReviewSnapshot();
 assert.ok(snapshot&&Array.isArray(snapshot.items),'Instagram review snapshot must execute server-side');
 assert.ok(Array.isArray(snapshot.ready),'Instagram review snapshot must expose READY rows');
