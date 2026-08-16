@@ -68,7 +68,7 @@ export async function runSocialCycle({trigger='manual',now=Date.now()}={}){
     const daily=await getDailyPublishedCount(now);
     if(shouldSkipDailyLimit(daily,cfg.maxPostsPerDay))return{status:'skipped',reason:'daily_limit',publishedToday:daily,durationMs:Date.now()-cycleStarted};
     const queueStarted=Date.now();let queue=await readSocialQueue(100);let fallbackReconciled=0;
-    if(!queue.length){const articles=await readArticles();const candidates=articles.filter(article=>article?.id&&article?.sitePublishedAt).slice(0,20);await Promise.allSettled(candidates.map(article=>queueSocialArticle(article)));fallbackReconciled=candidates.length;queue=await readSocialQueue(20);}
+    if(!queue.length){const articles=await readArticles();const candidates=articles.filter(article=>article?.id&&article?.sitePublishedAt).slice(0, 20);await Promise.allSettled(candidates.map(article=>queueSocialArticle(article)));fallbackReconciled=candidates.length;queue=await readSocialQueue(20);}
     const queueReadMs=Date.now()-queueStarted;const eligible=buildEligibleSocialQueue(queue);
     if(!eligible.length)return{status:'skipped',reason:'queue_empty',queueReadMs,fallbackReconciled,durationMs:Date.now()-cycleStarted};
     const metaStarted=Date.now();const usage=await getPublishingUsage();const metaLimitMs=Date.now()-metaStarted;
