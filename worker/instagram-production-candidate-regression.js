@@ -18,11 +18,11 @@ assert.equal(pool.existingCandidates.length,0);
 assert.ok(pool.freshCandidates.every(item=>item.selectionScore!==undefined));
 
 const tenFailed=Array.from({length:10},(_,i)=>{const a=article(`failed-${i}`,`Failed ${i}`);return {queueId:`failed-${i}:q`,articleId:a.id,status:'FAILED',failureCode:'CARD_PUBLIC_TIMEOUT',nextRetryAt:new Date(now-60000).toISOString()};});
-const fresh=[freshA,freshB,article('fresh-c','Fresh C'),article('fresh-d','Fresh D'),article('fresh-e','Fresh E'),article('fresh-f','Fresh F')];
+const fresh=Array.from({length:20},(_,i)=>article(`fresh-${i}`,`Fresh ${i}`));
 const freshQueue=tenFailed.map(row=>({article:article(row.articleId,row.articleId),articleId:row.articleId,state:'failed'}));
 const fair=buildPreparationCandidatePool({articles:[...fresh,...freshQueue.map(x=>x.article)],queue:freshQueue,existing:tenFailed,recentPublished:[],now});
 assert.equal(fair.existingCandidates.length,10,'pool exposes old failures; runtime must cap retry slots');
-assert.ok(fair.freshCandidates.length>=6,'fresh candidates remain available');
+assert.ok(fair.freshCandidates.length>=20,'fresh candidates remain available');
 const fairPool=orderPreparationCandidates({freshCandidates:fair.freshCandidates,failedCandidates:fair.existingCandidates,maxAttempts:10,maxFailedRetries:2});
 assert.equal(fairPool.length,10);
 assert.equal(fairPool.filter(item=>item.state==='failed').length,2);
@@ -41,12 +41,7 @@ const repairedPool=buildPreparationCandidatePool({articles:[sameArticle],queue:[
 assert.equal(repairedPool.existingCandidates[0].prior.queueId,'same:q');
 assert.equal(repairedPool.existingCandidates[0].prior.cardUrls.length,2);
 
-const simulated=[
-  {article:{id:'A'},state:'failed'},
-  {article:{id:'B'},state:'failed'},
-  {article:{id:'C'},state:'queued'},
-  {article:{id:'D'},state:'queued'}
-];
+const simulated=[{article:{id:'A'},state:'failed'},{article:{id:'B'},state:'failed'},{article:{id:'C'},state:'queued'},{article:{id:'D'},state:'queued'}];
 const outcomes=new Map([['A','FAIL'],['B','FAIL'],['C','READY'],['D','READY']]);
 let attempted=0;let readyCreated=0;const failedIds=[];for(const candidate of simulated){attempted++;try{if(outcomes.get(candidate.article.id)==='FAIL')throw new Error('recoverable');if(outcomes.get(candidate.article.id)==='READY')readyCreated++;}catch(error){failedIds.push(candidate.article.id);continue;}if(readyCreated>=2)break;}
 assert.equal(attempted,4);assert.equal(readyCreated,2);assert.deepEqual(failedIds,['A','B']);
@@ -61,4 +56,4 @@ assert.match(runtime,/LAST_CANDIDATE/);
 assert.match(runtime,/if\(remainingMs\(\)<MIN_CANDIDATE_RESERVE_MS\)/);
 assert.match(runtime,/metaCalls:0/);
 
-console.log('Instagram production candidate regression: PASS failure isolation contract (A fail/B fail/C ready/D ready), fresh-vs-old retry budget, backoff skip, rotation cursor, stale-card same queueId/cache, and bounded preparation loop');
+console.log('Instagram production candidate regression: PASS failure isolation contract (A fail/B fail/C ready/D ready), 2-failed+8-fresh retry budget, backoff skip, rotation cursor, stale-card same queueId/cache, and bounded preparation loop');
