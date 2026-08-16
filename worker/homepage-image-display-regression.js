@@ -5,8 +5,9 @@ const fallback0={id:'fallback0',imageStatus:'fallback',totalViews:0,publishedAt:
 const fallback9={id:'fallback9',imageStatus:'fallback',totalViews:9,publishedAt:'2026-08-16T03:55:00Z'};
 const fallback10={id:'fallback10',imageStatus:'fallback',totalViews:10,publishedAt:'2026-08-16T03:45:00Z'};
 const fallback25={id:'fallback25',imageSource:'default',totalViews:25,publishedAt:'2026-08-16T03:35:00Z'};
-assert.equal(hasRealSourceImage(real),true);assert.equal(eligibleForLatestDisplay(real),true);assert.equal(eligibleForLatestDisplay(fallback0),false);assert.equal(eligibleForLatestDisplay(fallback9),false);assert.equal(eligibleForLatestDisplay(fallback10),true);assert.equal(eligibleForLatestDisplay(fallback25),true);
+const invalidSource={id:'invalidSource',imageStatus:'invalid',imageSource:'rss',imageUrl:'https://example.test/broken.jpg',totalViews:100,publishedAt:'2026-08-16T04:00:00Z'};
+assert.equal(hasRealSourceImage(real),true);assert.equal(eligibleForLatestDisplay(real),true);assert.equal(eligibleForLatestDisplay(fallback0),false);assert.equal(eligibleForLatestDisplay(fallback9),false);assert.equal(eligibleForLatestDisplay(fallback10),true);assert.equal(eligibleForLatestDisplay(fallback25),true);assert.equal(hasRealSourceImage(invalidSource),false);assert.equal(eligibleForLatestDisplay(invalidSource),false);
 const ordered=latestDisplayArticles([fallback0,real,fallback10,fallback9]);assert.deepEqual(ordered.map(a=>a.id),['fallback10','real']);
 const warningFallback={id:'warning',totalViews:0,publishWarnings:['missing_image','image_fallback_used'],publishedAt:'2026-08-16T04:00:00Z'};assert.equal(eligibleForLatestDisplay(warningFallback),false);
 const popularFallback={id:'popular',imageStatus:'fallback',totalViews:100,todayViews:100,publishedAt:'2026-08-16T04:10:00Z'};assert.equal(eligibleForLatestDisplay(popularFallback),true);
-console.log('Homepage image display regression: PASS real-image priority, fallback 10-view gate, filter-before-limit ordering');
+console.log('Homepage image display regression: PASS real-image priority, fallback 10-view gate, invalid-source guard, filter-before-limit ordering');
