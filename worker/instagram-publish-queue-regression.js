@@ -17,7 +17,7 @@ assert.match(queue,/META_ACTION_THROTTLE/,'queue must use exact throttle reason'
 assert.match(queue,/WAITING_META/,'queue must support WAITING_META');
 assert.match(queue,/priority/,'queue must support priority');
 assert.match(queue,/removeInstagramPublishQueueItem/,'queue must support admin removal');
-assert.match(queue,/estimatedPublishingQuotaResumeAt|estimatePublishingQuotaResumeAt/,'rolling quota estimate must exist');
+assert.match(queue,/estimatePublishingQuotaResumeAt/,'rolling quota estimate must exist');
 assert.match(auto,/publishAttempted=1/,'auto drain must be bounded to one controlled publish attempt per run');
 assert.match(auto,/META_ACTION_THROTTLE/,'auto worker must stop on action throttle');
 assert.match(auto,/metaCalls/,'auto telemetry must report Meta calls');
