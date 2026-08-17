@@ -24,4 +24,5 @@ jobs:
       - run: npm test
       - run: npm run test:admin-ui
       - run: npm run test:admin-instagram-server
+      - run: npm run test:redis-read-amplification
       - run: npm run build
