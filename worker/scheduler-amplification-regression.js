@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+const socialRoute=await readFile(new URL('../app/api/cron/social-prepare/route.js',import.meta.url),'utf8');
+const newsRoute=await readFile(new URL('../app/api/cron/news-publish/route.js',import.meta.url),'utf8');
+const autoUpload=await readFile(new URL('../lib/instagram-auto-upload.js',import.meta.url),'utf8');
+const publishQueue=await readFile(new URL('../lib/instagram-publish-queue.js',import.meta.url),'utf8');
+const dashboard=await readFile(new URL('../app/admin-instagram/InstagramDashboard.jsx',import.meta.url),'utf8');
+const page=await readFile(new URL('../app/admin-instagram/page.jsx',import.meta.url),'utf8');
+const adminSnapshot=await readFile(new URL('../lib/instagram-admin-snapshot.js',import.meta.url),'utf8');
+const instagram=await readFile(new URL('../lib/instagram.js',import.meta.url),'utf8');
+const getStart=newsRoute.indexOf('export async function GET');const postStart=newsRoute.indexOf('export async function POST');const getBlock=newsRoute.slice(getStart,postStart);
+assert.match(socialRoute,/delivery\.retried>0/);assert.match(socialRoute,/qstash_retry_ignored_periodic_job/);assert.match(socialRoute,/return NextResponse\.json\(\{status:'skipped'/);assert.ok(socialRoute.indexOf('qstash_retry_ignored_periodic_job')<socialRoute.indexOf('prepareInstagramProductionQueue'));
+assert.match(newsRoute,/export async function GET\(request\)/);assert.match(newsRoute,/legacy_get_scheduler_disabled/);assert.ok(getStart>=0&&postStart>getStart);assert.doesNotMatch(getBlock,/runPublicationCycle/);assert.match(newsRoute,/export async function POST\(request\)/);assert.match(newsRoute,/withPersistenceSource\('news-publish'/);assert.match(newsRoute,/deliveryClassification/);
+assert.match(autoUpload,/getInstagramPublishThrottle\(\{now\}\)/);assert.match(autoUpload,/if\(throttle\.active&&!throttle\.probeDue\)return/);assert.ok(autoUpload.indexOf('getInstagramPublishGate({now})')<autoUpload.indexOf('listInstagramReviewQueue()'));assert.doesNotMatch(autoUpload,/if\(throttle\.active&&!throttle\.probeDue\)\{[\s\S]*?bulkEnqueueInstagramPublishItems/);
+assert.match(publishQueue,/PROBE_LOCK/);assert.match(publishQueue,/META_ACTION_PROBE_BUSY/);assert.match(publishQueue,/publishingUsage=null/);assert.match(publishQueue,/effectiveEstimatedResumeAt/);assert.match(publishQueue,/idempotencyKey=null/);assert.match(publishQueue,/metaCalls:0/);
+assert.match(dashboard,/120000/);assert.match(dashboard,/visibilityState/);assert.doesNotMatch(dashboard,/useEffect\(\(\)=>\{refresh\(\);/);assert.match(dashboard,/Tunggu hingga/);assert.match(dashboard,/Publishing quota/);assert.match(dashboard,/META_ACTION_THROTTLE/);
+assert.doesNotMatch(page,/forceRefresh:true/);assert.match(adminSnapshot,/ba:social:instagram:admin-snapshot:v2/);assert.match(adminSnapshot,/delKey\(MATERIALIZED_KEY\)/);assert.match(instagram,/PUBLISHING_USAGE_CACHE_MS/);assert.match(instagram,/publishingUsageInFlight/);
+console.log('Scheduler/admin/throttle regression: PASS retry zero-Redis fast paths, GET suppression, authoritative POST, probe-before-queue, single probe lock, materialized admin snapshot, 120s polling, action-throttle UI, and publishing usage dedupe');
