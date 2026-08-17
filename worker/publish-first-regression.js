@@ -14,12 +14,12 @@ try{
  assert.equal(isPublishableSourceImage({status:'valid',imageUrl:DEFAULT_IMAGE_URL,source:'rss'}),false);
  globalThis.fetch=async(url)=>{if(String(url).includes('bad-image'))return new Response('no',{status:404});return new Response('not found',{status:404});};
  await assert.rejects(()=>enrichArticle({title:'Gambar rusak',url:'https://example.com/article',imageUrl:'https://cdn.example.com/bad-image.jpg',fingerprint:'broken'}),error=>error.reason==='IMAGE_SOURCE_INVALID');
- globalThis.fetch=async(url)=>{if(String(url).includes('real-image'))return new Response('x'.repeat(4096),{status:200,headers:{'content-type':'image/jpeg'}});return new Response('not found',{status:404});};
- const valid=await enrichArticle({title:'Gambar valid',url:'https://example.com/article',imageUrl:'https://cdn.example.com/real-image.jpg',imageSource:'rss',fingerprint:'valid'});
- assert.equal(valid.status,'valid');assert.equal(valid.imageUrl,'https://cdn.example.com/real-image.jpg');assert.equal(valid.source,'rss');assert.equal(isPublishableSourceImage(valid),true);
- globalThis.fetch=async(url)=>{if(String(url).includes('article'))return new Response('<meta property="og:image" content="https://cdn.example.com/og-image.jpg">',{status:200,headers:{'content-type':'text/html'}});if(String(url).includes('og-image'))return new Response('x'.repeat(4096),{status:200,headers:{'content-type':'image/jpeg'}});return new Response('not found',{status:404});};
+ globalThis.fetch=async()=>new Response('x'.repeat(4096),{status:200,headers:{'content-type':'image/jpeg'}});
+ const valid=await enrichArticle({title:'Gambar valid',url:'https://example.com/article',imageUrl:'https://cdn.example.com/photo.jpg',imageSource:'rss',fingerprint:'valid'});
+ assert.equal(valid.status,'valid');assert.equal(valid.imageUrl,'https://cdn.example.com/photo.jpg');assert.equal(valid.source,'rss');assert.equal(isPublishableSourceImage(valid),true);
+ globalThis.fetch=async(url,options={})=>{const accept=String(options?.headers?.accept||'');if(accept.includes('text/html'))return new Response('<meta property="og:image" content="https://cdn.example.com/og-photo.jpg">',{status:200,headers:{'content-type':'text/html'}});return new Response('x'.repeat(4096),{status:200,headers:{'content-type':'image/jpeg'}});};
  const ogValid=await enrichArticle({title:'RSS image missing but OG valid',url:'https://example.com/article',imageUrl:null,fingerprint:'og-valid'});
- assert.equal(ogValid.status,'valid');assert.equal(ogValid.source,'og');assert.equal(ogValid.imageUrl,'https://cdn.example.com/og-image.jpg');
+ assert.equal(ogValid.status,'valid');assert.equal(ogValid.source,'og');assert.equal(ogValid.imageUrl,'https://cdn.example.com/og-photo.jpg');
  const pendingWithNoImage=[{fingerprint:'cnn-1',titleFingerprint:'cnn-title',title:'CNN',summary:'old',publishedAt:'2026-08-16T00:10:00Z',imageUrl:null,category:'Nasional'}];
  const freshSameId=[{fingerprint:'cnn-1',titleFingerprint:'cnn-title',title:'CNN',summary:'fresh',publishedAt:'2026-08-16T00:30:00Z',imageUrl:'https://cdn.example.com/cnn.jpg',imageSource:'rss',category:'Nasional'}];
  const merge=selectIngestionCandidates(freshSameId,new Set(),pendingWithNoImage,[],Date.parse('2026-08-16T00:31:00Z'));
