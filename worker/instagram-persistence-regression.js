@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 process.env.UPSTASH_REDIS_REST_URL='https://example.invalid';
 process.env.UPSTASH_REDIS_REST_TOKEN='test-token';
-const {PersistenceError,getJson,sortedAdd}=await import(`../lib/persistence.js?regression=${Date.now()}`);
+const {PersistenceError,getJson,sortedAdd,listJson}=await import(`../lib/persistence.js?regression=${Date.now()}`);
 let calls=0;const originalFetch=globalThis.fetch;
 globalThis.fetch=async()=>{calls++;if(calls===1)return new Response(JSON.stringify({error:'temporarily unavailable'}),{status:400,headers:{'content-type':'application/json'}});return new Response(JSON.stringify({result:'{"ok":true}'}),{status:200,headers:{'content-type':'application/json'}})};
 const value=await getJson('test:key');assert.deepEqual(value,{ok:true});assert.equal(calls,2,'transient 400 should be retried once');
 globalThis.fetch=async()=>new Response(JSON.stringify({error:'ERR invalid payload'}),{status:400,headers:{'content-type':'application/json'}});
 await assert.rejects(()=>getJson('bad:key'),error=>{assert.ok(error instanceof PersistenceError);assert.equal(error.code,'PERSISTENCE_HTTP_400');assert.match(error.message,/ERR invalid payload/);return true});
 await assert.rejects(()=>sortedAdd('idx',Number.NaN,'id'),error=>{assert.equal(error.code,'PERSISTENCE_INVALID_SCORE');return true});
+let listCall=0;globalThis.fetch=async(_url,options)=>{const command=JSON.parse(options.body);listCall++;if(command[0]==='SMEMBERS')return new Response(JSON.stringify({result:['good:key','bad:key']}),{status:200});if(command[1]==='good:key')return new Response(JSON.stringify({result:'{"queueId":"good","status":"READY"}'}),{status:200});return new Response(JSON.stringify({result:'{malformed-json'}),{status:200});};
+const rows=await listJson('queue:index');assert.deepEqual(rows,[{queueId:'good',status:'READY'}]);assert.equal(listCall,3,'listJson should read both items and quarantine only the malformed item');
 globalThis.fetch=originalFetch;
-console.log('Instagram persistence regression: PASS exact errors, bounded transient retry, malformed command classification, and sorted-score validation');
+console.log('Instagram persistence regression: PASS exact errors, bounded retry, malformed command classification, invalid score validation, and malformed-item isolation');
