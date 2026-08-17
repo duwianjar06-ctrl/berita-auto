@@ -116,11 +116,27 @@ AI telemetry may log provider, model, status, duration and article fingerprint o
 Environment variable: `GEMINI_API_KEY`. `.env.example` may contain only the empty variable name. The production credential must live only in Vercel Environment Variables and must never be committed.
 
 ## Scheduler
-**Primary scheduler: QStash.** It targets `GET https://berita-auto.vercel.app/api/cron/news-publish` with `Authorization: Bearer <CRON_SECRET>` forwarded securely. Target cadence: `*/5 * * * *`.
+**Primary scheduler: QStash.** The repository does not create or mutate QStash schedules; schedule configuration is external operational state. Recommended production staggering is:
+- news-publish: `*/15 * * * *`
+- social-prepare: `2-59/15 * * * *`
+- social-publish: `5-59/15 * * * *`
 
-**Fallback/watchdog: GitHub Actions on `main`.** `.github/workflows/feature-branch-scheduler.yml` calls the same secured production endpoint and contains no duplicate publication business logic. It runs at `7,22,37,52 * * * *` as a lower-priority 15-minute fallback/watchdog. `.github/workflows/auto-news.yml` is legacy and is not the production scheduler.
+This gives the intended sequence at each 15-minute cadence: T+0 news publication, T+2 bounded Instagram preparation when the READY buffer needs refill, and T+5 Instagram publication. If external schedules are temporarily aligned, application safety still relies on independent prepare/publish locks and durable READY state; a publisher may consume an existing READY item while preparation is active.
 
-All triggers call the same `runPublicationCycle`. Do not create a second worker path.
+**Fallback/watchdog: GitHub Actions on `main`.** `.github/workflows/feature-branch-scheduler.yml` calls the same secured production endpoint and contains no duplicate publication business logic. `.github/workflows/auto-news.yml` is legacy and is not the production scheduler.
+
+News triggers call the same `runPublicationCycle`. Do not create a second news worker path.
+
+## Instagram Prepare / Publish Separation
+`/api/cron/social-prepare` is preparation-only. It may validate, render, persist, and move a bounded number of queue items into READY, but it must never create Instagram media containers or call `media_publish`.
+
+`/api/cron/social-publish` is the authoritative Instagram publisher and owns Meta publishing attempts, quota checks, action throttling, probe locking, reconciliation, and duplicate prevention.
+
+The preparation lock (`ba:social:instagram:prepare:lock`) and publisher lock (`ba:social:instagram:auto-upload:lock`) are intentionally different. They must never be collapsed into one lock: an active preparation must not block publication of an already-READY item. Persistent READY state is the handoff boundary between the two jobs.
+
+Prepare uses READY hysteresis: high-water 5, low-water 2, maximum 3 preparations per run. When READY is above the low-water mark it fast-paths without candidate preparation. When READY is at or below the low-water mark it prepares only enough bounded work to refill toward the high-water mark. A large raw QUEUED backlog must never be used as a blind stop condition.
+
+Manual/QStash scheduler staggering is operational configuration, not repository code. Never add QStash API calls to application routes merely to coordinate these jobs.
 
 ## Admin / Pipeline
 Admin source distribution is calculated from persisted published articles. It must show real publisher counts and percentages, not synthetic values. The Automation / News Pipeline tab must expose actual worker state, provider metadata, publication result, AI timing, and source telemetry.
