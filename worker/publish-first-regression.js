@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {selectPublication,selectIngestionCandidates} from './strategy.js';
-import {enrichArticle,DEFAULT_IMAGE_URL} from './image-enrichment.js';
+import {enrichArticle,DEFAULT_IMAGE_URL,isPublishableSourceImage} from './image-enrichment.js';
 import {filterByProcessingStatus,processingCounts,humanWarnings} from '../lib/admin-processing.js';
 const originalFetch=globalThis.fetch;
 try{
@@ -9,14 +9,17 @@ try{
  const chosen=selectPublication([older,newest],[],Date.parse('2026-08-16T00:31:00Z'));
  assert.equal(chosen.fingerprint,'new','newest valid candidate must win over enrichment/image preference');
  globalThis.fetch=async()=>new Response('not found',{status:404});
- const image=await enrichArticle({title:'Tanpa gambar',url:'https://example.com/article',imageUrl:null,fingerprint:'missing'});
- assert.equal(image.status,'fallback');assert.equal(image.imageUrl,DEFAULT_IMAGE_URL);assert.equal(image.source,'fallback');
+ await assert.rejects(()=>enrichArticle({title:'Tanpa gambar',url:'https://example.com/article',imageUrl:null,fingerprint:'missing'}),error=>{assert.equal(error.reason,'IMAGE_SOURCE_UNAVAILABLE');assert.equal(error.code,'IMAGE_PUBLICATION_GATE');return true;});
+ assert.equal(isPublishableSourceImage({status:'fallback',imageUrl:DEFAULT_IMAGE_URL,source:'fallback'}),false);
+ assert.equal(isPublishableSourceImage({status:'valid',imageUrl:DEFAULT_IMAGE_URL,source:'rss'}),false);
  globalThis.fetch=async(url)=>{if(String(url).includes('bad-image'))return new Response('no',{status:404});return new Response('not found',{status:404});};
- const broken=await enrichArticle({title:'Gambar rusak',url:'https://example.com/article',imageUrl:'https://cdn.example.com/bad-image.jpg',fingerprint:'broken'});
- assert.equal(broken.status,'fallback');assert.equal(broken.imageUrl,DEFAULT_IMAGE_URL);
+ await assert.rejects(()=>enrichArticle({title:'Gambar rusak',url:'https://example.com/article',imageUrl:'https://cdn.example.com/bad-image.jpg',fingerprint:'broken'}),error=>error.reason==='IMAGE_SOURCE_INVALID');
  globalThis.fetch=async(url)=>{if(String(url).includes('real-image'))return new Response('image-bytes',{status:200,headers:{'content-type':'image/jpeg','content-length':'4096'}});return new Response('not found',{status:404});};
  const valid=await enrichArticle({title:'Gambar valid',url:'https://example.com/article',imageUrl:'https://cdn.example.com/real-image.jpg',imageSource:'rss',fingerprint:'valid'});
- assert.equal(valid.status,'valid');assert.equal(valid.imageUrl,'https://cdn.example.com/real-image.jpg');assert.equal(valid.source,'rss');
+ assert.equal(valid.status,'valid');assert.equal(valid.imageUrl,'https://cdn.example.com/real-image.jpg');assert.equal(valid.source,'rss');assert.equal(isPublishableSourceImage(valid),true);
+ globalThis.fetch=async(url)=>{if(String(url).includes('article'))return new Response('<meta property="og:image" content="https://cdn.example.com/og-image.jpg">',{status:200,headers:{'content-type':'text/html'}});if(String(url).includes('og-image'))return new Response('image-bytes',{status:200,headers:{'content-type':'image/jpeg','content-length':'4096'}});return new Response('not found',{status:404});};
+ const ogValid=await enrichArticle({title:'RSS image missing but OG valid',url:'https://example.com/article',imageUrl:null,fingerprint:'og-valid'});
+ assert.equal(ogValid.status,'valid');assert.equal(ogValid.source,'og');assert.equal(ogValid.imageUrl,'https://cdn.example.com/og-image.jpg');
  const pendingWithNoImage=[{fingerprint:'cnn-1',titleFingerprint:'cnn-title',title:'CNN',summary:'old',publishedAt:'2026-08-16T00:10:00Z',imageUrl:null,category:'Nasional'}];
  const freshSameId=[{fingerprint:'cnn-1',titleFingerprint:'cnn-title',title:'CNN',summary:'fresh',publishedAt:'2026-08-16T00:30:00Z',imageUrl:'https://cdn.example.com/cnn.jpg',imageSource:'rss',category:'Nasional'}];
  const merge=selectIngestionCandidates(freshSameId,new Set(),pendingWithNoImage,[],Date.parse('2026-08-16T00:31:00Z'));
@@ -30,5 +33,5 @@ try{
  const counts=processingCounts([warningArticle,goodArticle]);assert.equal(counts.published,2);assert.equal(counts.warning,1);assert.equal(counts.paraphrase,1);assert.equal(counts.translation,1);assert.equal(filterByProcessingStatus([warningArticle,goodArticle],'warning').length,1);assert.deepEqual(humanWarnings(warningArticle),['Gambar sumber tidak tersedia.','Gemini Primary gagal memproses artikel.','Artikel diterbitkan menggunakan fallback.']);
  const noPublish={published:0,indexablePublished:0,publishedWithWarnings:0,providerUsedForPublished:{}};
  assert.equal(noPublish.published,0);assert.equal(noPublish.indexablePublished,0);assert.equal(noPublish.publishedWithWarnings,0);assert.deepEqual(noPublish.providerUsedForPublished,{});
- console.log('Publish-first regression: PASS newest-first image-fallback broken-image source-image queue-merge retry-cooldown admin-warning telemetry');
+ console.log('Publish-first regression: PASS hard image gate, default fallback rejection, invalid-image rejection, OG replacement, source-image validation, queue-merge retry-cooldown admin-warning telemetry');
 }catch(error){console.error('Publish-first regression: FAIL',error);process.exitCode=1}finally{globalThis.fetch=originalFetch}
