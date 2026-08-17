@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+process.env.UPSTASH_REDIS_REST_URL='https://example.invalid';
+process.env.UPSTASH_REDIS_REST_TOKEN='test-token';
+const {PersistenceError,getJson,sortedAdd}=await import(`../lib/persistence.js?regression=${Date.now()}`);
+let calls=0;const originalFetch=globalThis.fetch;
+globalThis.fetch=async()=>{calls++;if(calls===1)return new Response(JSON.stringify({error:'temporarily unavailable'}),{status:400,headers:{'content-type':'application/json'}});return new Response(JSON.stringify({result:'{"ok":true}'}),{status:200,headers:{'content-type':'application/json'}})};
+const value=await getJson('test:key');assert.deepEqual(value,{ok:true});assert.equal(calls,2,'transient 400 should be retried once');
+globalThis.fetch=async()=>new Response(JSON.stringify({error:'ERR invalid payload'}),{status:400,headers:{'content-type':'application/json'}});
+await assert.rejects(()=>getJson('bad:key'),error=>{assert.ok(error instanceof PersistenceError);assert.equal(error.code,'PERSISTENCE_HTTP_400');assert.match(error.message,/ERR invalid payload/);return true});
+await assert.rejects(()=>sortedAdd('idx',Number.NaN,'id'),error=>{assert.equal(error.code,'PERSISTENCE_INVALID_SCORE');return true});
+globalThis.fetch=originalFetch;
+console.log('Instagram persistence regression: PASS exact errors, bounded transient retry, malformed command classification, and sorted-score validation');
