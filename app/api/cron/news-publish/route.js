@@ -1,24 +1,12 @@
 import {NextResponse} from 'next/server';
 import {runPublicationCycle} from '../../../../worker/run.js';
+import {withPersistenceSource} from '../../../../lib/persistence.js';
+import {qstashDeliveryInfo} from '../../../../lib/upstash-quota.js';
 
 export const dynamic='force-dynamic';
 export const runtime='nodejs';
-
-function authorized(request){
-  const secret=process.env.CRON_SECRET||'';
-  const auth=request.headers.get('authorization')||'';
-  return Boolean(secret&&auth===`Bearer ${secret}`);
-}
-
-export async function GET(request){
-  if(!authorized(request))return NextResponse.json({error:'Unauthorized'},{status:401});
-  try{
-    const result=await runPublicationCycle({trigger:'vercel-cron',now:Date.now()});
-    return NextResponse.json(result,{status:200,headers:{'Cache-Control':'no-store'}});
-  }catch(error){
-    return NextResponse.json({status:'failed',error:String(error?.message||error).slice(0,240)},{status:503,headers:{'Cache-Control':'no-store'}});
-  }
-}
-export async function POST(request) {
-  return GET(request);
-}
+function authorized(request){const secret=process.env.CRON_SECRET||'';const auth=request.headers.get('authorization')||'';return Boolean(secret&&auth===`Bearer ${secret}`)}
+function logDelivery(request,classification){const delivery=qstashDeliveryInfo(request);console.log('[news-publish-delivery]',JSON.stringify({route:'/api/cron/news-publish',method:request.method,...delivery,classification,userAgent:request.headers.get('user-agent')||null,timestamp:new Date().toISOString()}));return delivery}
+export async function GET(request){if(!authorized(request))return NextResponse.json({error:'Unauthorized'},{status:401});const delivery=logDelivery(request,'LEGACY_GET');return NextResponse.json({status:'skipped',reason:'legacy_get_scheduler_disabled',delivery:delivery.delivery},{status:200,headers:{'Cache-Control':'no-store'}})}
+export async function POST(request){if(!authorized(request))return NextResponse.json({error:'Unauthorized'},{status:401});const delivery=logDelivery(request,deliveryClassification(request));if(delivery.retried>0){console.log('[qstash-delivery-skip]',JSON.stringify({route:'/api/cron/news-publish',scheduleId:delivery.scheduleId,messageId:delivery.messageId,retried:delivery.retried,reason:'qstash_retry_ignored_periodic_job'}));return NextResponse.json({status:'skipped',reason:'qstash_retry_ignored_periodic_job',delivery:delivery.delivery},{status:200,headers:{'Cache-Control':'no-store'}})}try{const result=await withPersistenceSource('news-publish',()=>runPublicationCycle({trigger:'qstash',now:Date.now()}));return NextResponse.json(result,{status:200,headers:{'Cache-Control':'no-store'}})}catch(error){return NextResponse.json({status:'failed',error:String(error?.message||error).slice(0,240)},{status:503,headers:{'Cache-Control':'no-store'}})}}
+function deliveryClassification(request){const retriedRaw=request.headers.get('Upstash-Retried');if(retriedRaw!=null)return Number(retriedRaw)>0?'QSTASH_RETRY':'QSTASH_INITIAL';const ua=(request.headers.get('user-agent')||'').toLowerCase();return ua.includes('qstash')?'QSTASH_INITIAL':'UNKNOWN_EXTERNAL'}
