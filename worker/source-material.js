@@ -1,46 +1,14 @@
+const SOURCE_CACHE_TTL_MS=60*60*1000;const SOURCE_CACHE_MAX=200;const sourceCache=new Map();
 function decode(value=''){
-  return String(value)
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,'$1')
-    .replace(/<script[\s\S]*?<\/script>/gi,' ')
-    .replace(/<style[\s\S]*?<\/style>/gi,' ')
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi,' ')
-    .replace(/<br\s*\/?>/gi,'\n')
-    .replace(/<\/p>|<\/div>|<\/li>|<\/h[1-6]>/gi,'\n')
-    .replace(/<[^>]*>/g,' ')
-    .replace(/&nbsp;|&#160;/gi,' ')
-    .replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;|&apos;/gi,"'")
-    .replace(/&lt;/g,'<').replace(/&gt;/g,'>')
-    .replace(/&#(\d+);/g,(_,n)=>String.fromCharCode(Number(n)))
-    .replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCharCode(parseInt(n,16)))
-    .replace(/\r/g,'').replace(/[ \t]+/g,' ')
-    .replace(/\n[ \t]+/g,'\n').replace(/\n{3,}/g,'\n\n')
-    .trim();
+  return String(value).replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,'$1').replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<noscript[\s\S]*?<\/noscript>/gi,' ').replace(/<br\s*\/?>/gi,'\n').replace(/<\/p>|<\/div>|<\/li>|<\/h[1-6]>/gi,'\n').replace(/<[^>]*>/g,' ').replace(/&nbsp;|&#160;/gi,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;|&apos;/gi,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#(\d+);/g,(_,n)=>String.fromCharCode(Number(n))).replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCharCode(parseInt(n,16))).replace(/\r/g,'').replace(/[ \t]+/g,' ').replace(/\n[ \t]+/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
 }
-function cleanParagraph(value=''){
-  const text=decode(value).replace(/\s+/g,' ').trim();
-  if(text.length<70)return '';
-  if(/^(?:baca juga|selengkapnya|subscribe|berlangganan|newsletter|ikuti kami|share|bagikan|advertisement|iklan|copyright|all rights reserved)\b/i.test(text))return '';
-  if(/^(?:temukan lebih banyak|rekomendasi|berita terkait|artikel terkait)\b/i.test(text))return '';
-  return text;
-}
-function uniqueParagraphs(values){const seen=new Set();const out=[];for(const value of values){const text=cleanParagraph(value);if(!text)continue;const key=text.toLowerCase().replace(/\W+/g,' ').trim();if(seen.has(key))continue;seen.add(key);out.push(text);}return out;}
+function cleanParagraph(value=''){const text=decode(value).replace(/\s+/g,' ').trim();if(text.length<70)return '';if(/^(?:baca juga|selengkapnya|subscribe|berlangganan|newsletter|ikuti kami|share|bagikan|advertisement|iklan|copyright|all rights reserved)\b/i.test(text))return '';if(/^(?:temukan lebih banyak|rekomendasi|berita terkait|artikel terkait)\b/i.test(text))return '';return text;}
+function uniqueParagraphs(values){const seen=new Set();const out=[];for(const value of values){const text=cleanParagraph(value);if(!text)continue;const key=text.toLowerCase().replace(/\W+/g,' ').trim();if(seen.has(key))continue;seen.add(key);out.push(text)}return out}
 function wordCount(value=''){return String(value).split(/\s+/).filter(Boolean).length;}
-function jsonLdBodies(html){const out=[];const scripts=html.match(/<script[^>]+type=[\"']application\/ld\+json[\"'][^>]*>[\s\S]*?<\/script>/gi)||[];for(const script of scripts){const raw=script.replace(/^<script[^>]*>/i,'').replace(/<\/script>$/i,'').trim();try{const parsed=JSON.parse(raw);const nodes=Array.isArray(parsed)?parsed:(Array.isArray(parsed?.['@graph'])?parsed['@graph']:[parsed]);for(const node of nodes){if(typeof node?.articleBody==='string')out.push(node.articleBody);}}catch{}}return out;}
-function htmlParagraphs(html){const selectors=[/<article\b[^>]*>[\s\S]*?<\/article>/gi,/<main\b[^>]*>[\s\S]*?<\/main>/gi,/<(?:div|section)\b[^>]*(?:class|id)=[\"'][^\"']*(?:article|story|content|body|post)[^\"']*[\"'][^>]*>[\s\S]*?<\/(?:div|section)>/gi];const regions=[];for(const re of selectors)regions.push(...(html.match(re)||[]));const sourceRegions=regions.length?regions:[html];const values=[];for(const region of sourceRegions){const ps=region.match(/<p\b[^>]*>[\s\S]*?<\/p>/gi)||[];values.push(...ps);if(values.length>=40)break;}return uniqueParagraphs(values);}
-async function fetchPageParagraphs(url){
-  if(!url)return [];
-  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),7000);
-  try{const response=await fetch(url,{signal:controller.signal,headers:{'user-agent':'BeritaAuto/1.4','accept':'text/html,application/xhtml+xml'}});if(!response.ok)throw new Error(`source ${response.status}`);const html=await response.text();const structured=uniqueParagraphs(jsonLdBodies(html));return structured.length>=3?structured:htmlParagraphs(html);}catch(error){console.warn(`[content] enrichment status=unavailable reason=${String(error?.message||error).slice(0,120)}`);return [];}finally{clearTimeout(timer);}
-}
-export async function fetchSourceMaterial(item){
-  const rssParagraphs=uniqueParagraphs(String(item.sourceMaterial||'').split(/\n{2,}/));
-  const rssMaterial=rssParagraphs.slice(0,40).join('\n\n').slice(0,28000);
-  const rssWords=wordCount(rssMaterial);
-  if(rssParagraphs.length>=2&&rssWords>=700){console.log(`[content] publisher=${item.publisher||item.sourceName||'unknown'} sourceChars=${rssMaterial.length} sourceWords=${rssWords} sourceParagraphs=${rssParagraphs.length} status=rss_content`);return rssMaterial;}
-  const enriched=await fetchPageParagraphs(item.url);
-  const merged=uniqueParagraphs([...rssParagraphs,...enriched]);
-  const material=merged.slice(0,40).join('\n\n').slice(0,28000);
-  const words=wordCount(material);
-  console.log(`[content] publisher=${item.publisher||item.sourceName||'unknown'} sourceChars=${material.length} sourceWords=${words} sourceParagraphs=${merged.length} status=${material?'enriched':'empty'} rssWords=${rssWords} enrichedParagraphs=${enriched.length}`);
-  return material||'';
-}
+function jsonLdBodies(html){const out=[];const scripts=html.match(/<script[^>]+type=[\"']application\/ld\+json[\"'][^>]*>[\s\S]*?<\/script>/gi)||[];for(const script of scripts){const raw=script.replace(/^<script[^>]*>/i,'').replace(/<\/script>$/i,'').trim();try{const parsed=JSON.parse(raw);const nodes=Array.isArray(parsed)?parsed:(Array.isArray(parsed?.['@graph'])?parsed['@graph']:[parsed]);for(const node of nodes)if(typeof node?.articleBody==='string')out.push(node.articleBody)}catch{}}return out}
+function htmlParagraphs(html){const selectors=[/<article\b[^>]*>[\s\S]*?<\/article>/gi,/<main\b[^>]*>[\s\S]*?<\/main>/gi,/<(?:div|section)\b[^>]*(?:class|id)=[\"'][^\"']*(?:article|story|content|body|post)[^\"']*[\"'][^>]*>[\s\S]*?<\/(?:div|section)>/gi];const regions=[];for(const re of selectors)regions.push(...(html.match(re)||[]));const sourceRegions=regions.length?regions:[html];const values=[];for(const region of sourceRegions){const ps=region.match(/<p\b[^>]*>[\s\S]*?<\/p>/gi)||[];values.push(...ps);if(values.length>=40)break}return uniqueParagraphs(values)}
+async function fetchPageParagraphs(url){if(!url)return [];const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),7000);try{const response=await fetch(url,{signal:controller.signal,headers:{'user-agent':'BeritaAuto/1.4','accept':'text/html,application/xhtml+xml'}});if(!response.ok)throw new Error(`source ${response.status}`);const html=await response.text();const structured=uniqueParagraphs(jsonLdBodies(html));return structured.length>=3?structured:htmlParagraphs(html)}catch(error){console.warn(`[content] enrichment status=unavailable reason=${String(error?.message||error).slice(0,120)}`);return []}finally{clearTimeout(timer)}}
+function sourceKey(item){return String(item?.sourceUrl||item?.url||'').trim();}
+function getCached(key){const entry=sourceCache.get(key);if(!entry)return null;if(entry.expiresAt<=Date.now()){sourceCache.delete(key);return null}return entry.value}
+function setCached(key,value){if(sourceCache.size>=SOURCE_CACHE_MAX){const first=sourceCache.keys().next().value;if(first)sourceCache.delete(first)}sourceCache.set(key,{value,expiresAt:Date.now()+SOURCE_CACHE_TTL_MS})}
+export async function fetchSourceMaterial(item){const key=sourceKey(item);const cached=key?getCached(key):null;if(cached!==null){console.log(`[content-cache] hit source=${item.publisher||item.sourceName||'unknown'} chars=${cached.length}`);return cached}const rssParagraphs=uniqueParagraphs(String(item.sourceMaterial||'').split(/\n{2,}/));const rssMaterial=rssParagraphs.slice(0,40).join('\n\n').slice(0,28000);const rssWords=wordCount(rssMaterial);if(rssParagraphs.length>=2&&rssWords>=700){if(key)setCached(key,rssMaterial);console.log(`[content] publisher=${item.publisher||item.sourceName||'unknown'} sourceChars=${rssMaterial.length} sourceWords=${rssWords} sourceParagraphs=${rssParagraphs.length} status=rss_content`);return rssMaterial}const enriched=await fetchPageParagraphs(item.url);const merged=uniqueParagraphs([...rssParagraphs,...enriched]);const material=merged.slice(0,40).join('\n\n').slice(0,28000);const words=wordCount(material);if(key)setCached(key,material||'');console.log(`[content] publisher=${item.publisher||item.sourceName||'unknown'} sourceChars=${material.length} sourceWords=${words} sourceParagraphs=${merged.length} status=${material?'enriched':'empty'} rssWords=${rssWords} enrichedParagraphs=${enriched.length}`);return material||'';}
