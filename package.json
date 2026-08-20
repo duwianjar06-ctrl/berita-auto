@@ -12,6 +12,7 @@
     "social:run":"node worker/social-run.js",
     "social:repair":"node worker/social-repair.js",
     "test":"node worker/test-suite.js",
+    "test:search-intent":"node worker/search-intent-regression.js",
     "test:social":"node worker/test-suite.js --social && node worker/social-card-design-regression.js && node worker/instagram-cleanup-regression.js && node worker/scheduler-amplification-regression.js",
     "test:social-design":"node worker/social-card-design-regression.js",
     "test:instagram-cleanup":"node worker/instagram-cleanup-regression.js",
@@ -31,6 +32,6 @@
     "test:redis-read-amplification":"node worker/redis-read-amplification-regression.js",
     "test:performance":"node worker/performance-regression.js"
   },
-  "dependencies":{"@auth/core":"0.41.3","@vercel/analytics":"^2.0.1","@vercel/blob":"2.6.1","@vercel/speed-insights":"^2.0.0","next":"15.5.21","next-auth":"^5.0.0-beta.29","react":"19.1.0","react-dom":"19.1.0"},
+  "dependencies":{"@auth/core":"0.41.3","@vercel/analytics":"^2.0.1","@vercel/blob":"2.6.1","@vercel/speed-insights":"^2.0.1","next":"15.5.21","next-auth":"^5.0.0-beta.29","react":"19.1.0","react-dom":"19.1.0"},
   "overrides":{"postcss":"8.5.25","sharp":"0.35.3"}
 }
