@@ -13,6 +13,7 @@
     "social:repair":"node worker/social-repair.js",
     "test":"node worker/test-suite.js",
     "test:search-intent":"node worker/search-intent-regression.js",
+    "test:validation-query":"node worker/validation-query-regression.js",
     "test:social":"node worker/test-suite.js --social && node worker/social-card-design-regression.js && node worker/instagram-cleanup-regression.js && node worker/scheduler-amplification-regression.js",
     "test:social-design":"node worker/social-card-design-regression.js",
     "test:instagram-cleanup":"node worker/instagram-cleanup-regression.js",
