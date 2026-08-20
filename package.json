@@ -11,7 +11,7 @@
     "news:repair":"node worker/repair.js",
     "social:run":"node worker/social-run.js",
     "social:repair":"node worker/social-repair.js",
-    "test":"node worker/test-suite.js",
+    "test":"node worker/test-suite.js && node worker/validation-query-regression.js",
     "test:search-intent":"node worker/search-intent-regression.js",
     "test:validation-query":"node worker/validation-query-regression.js",
     "test:social":"node worker/test-suite.js --social && node worker/social-card-design-regression.js && node worker/instagram-cleanup-regression.js && node worker/scheduler-amplification-regression.js",
