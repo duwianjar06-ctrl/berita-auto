@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {extractEntities,generateSearchQueries,scoreSearchOpportunity,findExistingSearchTopic} from '../lib/search-intent.js';
+const now=new Date().toISOString();
+const cases=[
+ {title:'Palermo vs Lecce',intent:'COMPARISON'},
+ {title:'Pemerintah Bakal Buka Seleksi CPNS 2027, Guru Diprioritaskan',intent:'PUBLIC_SERVICE'},
+ {title:'Jadwal dan Lokasi Samsat Keliling Jadetabek Hari Ini',intent:'DAILY_UTILITY'},
+ {title:'Kapan Pembatasan Pertalite Berlaku?',intent:'POLICY'},
+ {title:'Gempa M 5,8 Kembali Guncang NTT',intent:'BREAKING'},
+ {title:'Toyota meluncurkan kendaraan baru dengan harga dan spesifikasi',intent:'SPECIFICATION'},
+ {title:'Smartphone baru diluncurkan dengan harga, RAM dan baterai',intent:'PRICE'},
+ {title:'Harga emas dan kurs rupiah hari ini',intent:'PRICE'}
+];
+for(const c of cases){const m=scoreSearchOpportunity({title:c.title,publishedAt:now},{sourceConfidence:90,multipleSourceConfirmation:75});assert(m.searchIntent.includes(c.intent),`${c.title}: missing ${c.intent}`);assert(Number.isInteger(m.searchScore)&&m.searchScore>=0&&m.searchScore<=100,'score range');assert(m.primaryQuery&&m.primaryQuery.length>3,'primary query');assert(Array.isArray(m.secondaryQueries)&&m.secondaryQueries.length<=5,'secondary query cap');assert(m.selectionReason.length>0,'explainable reason');assert(m.socialScore!==m.searchScore||m.searchScore===m.socialScore,'separate score fields');assert(m.distributionDecision,'distribution decision')}
+const football=scoreSearchOpportunity({title:'Palermo vs Lecce',publishedAt:now});assert.deepEqual(extractEntities({title:'Palermo vs Lecce'}).sportsTeam,['Palermo','Lecce']);assert(generateSearchQueries({title:'Palermo vs Lecce'},football.searchIntent,football.entities).primaryQuery.includes('palermo vs lecce'));
+const existing={id:'old',title:'Jadwal dan Lokasi Samsat Keliling Jadetabek Hari Ini',publishedAt:now};const candidate={title:'Samsat Keliling Jadetabek Hari Ini: Jadwal dan Lokasi Terbaru',publishedAt:now};assert(findExistingSearchTopic(candidate,[existing]),'topic cluster should find existing article');
+const safe=scoreSearchOpportunity({title:'Berita ekonomi tanpa angka spekulatif',publishedAt:now},{speculative:true});assert(safe.searchScore<100,'penalty applied');
+console.log('[search-intent] PASS classifier/query/score/distribution/topic-cluster/fact-safety');
