@@ -1,0 +1,30 @@
+name: Verify Feature Branch
+
+on:
+  push:
+    branches:
+      - feature/auto-news-mvp
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Validation query regression
+        run: npm run test:validation-query
+      - name: Admin UI regression
+        run: npm run test:admin-ui
+      - name: Full test suite
+        run: npm test
+      - name: Build
+        run: npm run build
