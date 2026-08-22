@@ -1,0 +1,5 @@
+import {auth} from '../../../../auth.js';
+import {runArticlePipeline} from '../../../../lib/article-pipeline.js';
+export const dynamic='force-dynamic';
+async function guard(){const session=await auth().catch(()=>null);const allowed=(process.env.ADMIN_EMAILS||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);const email=session?.user?.email?.trim().toLowerCase();return Boolean(email&&allowed.includes(email))}
+export async function POST(request){if(!await guard())return Response.json({error:'unauthorized'},{status:401});try{const body=await request.json();const result=await runArticlePipeline(body,{dryRun:Boolean(body?.dryRun)});return Response.json({status:result.status,reason:result.reason||null,articleId:result.article?.id||null,slug:result.article?.slug||null,searchScore:result.article?.searchScore??result.idea?.searchScore??null,qualityScore:result.quality?.qualityScore??null,sourcesCount:result.research?.sourceCount??0})}catch(error){return Response.json({error:'article_pipeline_failed'},{status:500})}}
