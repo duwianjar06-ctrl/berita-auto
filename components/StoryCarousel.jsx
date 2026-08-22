@@ -3,7 +3,8 @@ import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {articlePath} from '../lib/article-url.js';
 import './story-carousel.css';
 
-const AUTO_ADVANCE_MS=500;
+// Autoplay is intentionally twice the previous interval so carousel velocity is 50%.
+const AUTO_ADVANCE_MS=1000;
 const TRANSITION_MS=320;
 
 export default function StoryCarousel({articles=[]}){
