@@ -3,7 +3,7 @@ import {buildArticleIdea,inferArticleType,scoreArticleIdea} from '../lib/article
 import {articleFingerprint,normalizeArticle} from '../lib/article-storage.js';
 import {validateArticleQuality} from '../lib/article-quality.js';
 import {buildArticleSEO} from '../lib/article-seo.js';
-import {automationGate,buildOutline} from '../lib/article-pipeline.js';
+import {automationGate,buildOutline,runArticlePipeline} from '../lib/article-pipeline.js';
 const idea=buildArticleIdea('Cara Menyetel Karburator Motor agar Langsam Stabil',{category:'Automotive'});
 assert.equal(idea.contentType,'article');assert.equal(idea.articleType,'HOW_TO');assert.equal(idea.primaryQuery,'cara menyetel karburator motor agar langsam stabil');assert.ok(scoreArticleIdea(idea)>=70);assert.ok(buildOutline(idea).length>=4);
 const normalized=normalizeArticle({...idea,status:'DRAFT'});assert.equal(normalized.contentType,'article');assert.equal(normalized.indexable,false);assert.equal(normalized.robots,'noindex, nofollow');assert.match(normalized.slug,/cara-menyetel-karburator/);
@@ -11,4 +11,5 @@ assert.notEqual(articleFingerprint({title:'A',primaryQuery:'a'}),articleFingerpr
 const quality=validateArticleQuality({...idea,content:'Jawaban singkat. '.repeat(80),outline:buildOutline(idea)},{sourceCount:3,facts:[{material:'technical facts'}]});assert.ok(quality.qualityScore>=0&&quality.qualityScore<=100);assert.ok(['READY','NEEDS_REVIEW'].includes(quality.status));
 const seo=buildArticleSEO({...normalized,status:'PUBLISHED',excerpt:'Panduan karburator',articleType:'HOW_TO',steps:[{name:'Satu'}]});assert.match(seo.canonical,/\/artikel\//);assert.equal(seo.schemaType,'HowTo');assert.equal(seo.robots,'index, follow');
 assert.equal(inferArticleType('Penyebab motor brebet saat digas'),'TROUBLESHOOTING');assert.equal(inferArticleType('Perbedaan injeksi dan karburator'),'COMPARISON');
-const gate=automationGate([]);assert.equal(gate.ok,true);console.log('article regression: PASS content type + idea + quality + SEO + automation gate');
+const gate=automationGate([]);assert.equal(gate.ok,true);
+const originalFetch=globalThis.fetch;globalThis.fetch=async()=>new Response('<html><body><h1>Karburator</h1><p>Setelan karburator perlu disesuaikan dengan model kendaraan dan kondisi mesin.</p><p>Idle dan campuran bahan bakar harus diperiksa secara bertahap.</p></body></html>',{status:200,headers:{'content-type':'text/html'}});const dry=await runArticlePipeline({topic:'Cara Menyetel Karburator Motor agar Langsam Stabil',category:'Automotive',articleType:'HOW_TO',primaryQuery:'cara menyetel karburator motor',sources:[{name:'Manufacturer Technical Reference',url:'https://example.test/source-1',sourceType:'manufacturer'},{name:'Automotive Technical Reference',url:'https://example.test/source-2',sourceType:'technical'}]},{dryRun:true});globalThis.fetch=originalFetch;assert.equal(dry.status,'DRY_RUN');assert.equal(dry.research.sourceCount,2);assert.ok(dry.outline.length>=4);console.log('article regression: PASS content type + idea + quality + SEO + automation gate + multi-source dry-run');
