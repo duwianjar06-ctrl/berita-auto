@@ -1,0 +1,7 @@
+import Link from 'next/link';
+import {listPublishedArticles} from '../../lib/article-storage.js';
+import './artikel.css';
+export const dynamic='force-dynamic';
+export const metadata={title:'Artikel | Berita Auto',description:'Panduan, tutorial, explainer dan pengetahuan evergreen Berita Auto'};
+export default async function ArtikelPage(){const articles=await listPublishedArticles();return <main className="article-public"><header className="article-public-head"><span>ARTIKEL</span><h1>Panduan &amp; Pengetahuan</h1><p>Artikel evergreen yang menjawab kebutuhan pencarian pengguna dengan sumber dan penjelasan yang jelas.</p></header><section className="article-feature-grid"><h2>Artikel Pilihan</h2><div className="article-public-grid">{articles.slice(0,12).map(a=><ArticleCard key={a.id} article={a}/>)}</div>{!articles.length&&<p>Belum ada artikel yang siap diterbitkan.</p>}</section></main>}
+function ArticleCard({article}){return <Link className="article-public-card" href={`/artikel/${article.slug}`}><div className="article-public-image">{article.imageUrl?<img src={article.imageUrl} alt="" loading="lazy"/>:<span>BA</span>}</div><div className="article-public-type">{article.articleType||'EVERGREEN'}</div><h3>{article.title}</h3><p>{article.excerpt||'Panduan dan pengetahuan praktis dari Berita Auto.'}</p><small>{article.category||'Umum'} · {article.readingTime||Math.max(3,Math.ceil(String(article.content||'').split(/\s+/).length/200))} menit baca</small></Link>}
