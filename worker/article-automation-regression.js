@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import {buildArticleIdea,discoverArticleOpportunity} from '../lib/article-ideas.js';
+import {buildArticleIdea,discoverArticleOpportunity,intentSignature} from '../lib/article-ideas.js';
 import {discoverArticleSources,validateResearch} from '../lib/article-research.js';
-import {automationEnabled,qstashEnabled,numericFactCoverage,runArticlePipeline} from '../lib/article-pipeline.js';
+import {automationEnabled,qstashEnabled,numericFactCoverage,runArticlePipeline,evaluateArticlePublicationState} from '../lib/article-pipeline.js';
 import {buildArticleImagePrompt,fallbackSvg,imageConfig} from '../lib/article-image.js';
 
 const previous={...process.env};
@@ -23,5 +23,8 @@ try{
   assert.equal(numericFactCoverage('Gunakan 12 volt dan 4 langkah.',{facts:[{material:'Gunakan 12 volt pada prosedur.'}]}),50);
   const config=imageConfig();assert.equal(config.aspectRatio,'16:9');assert.equal(config.width,1200);assert.equal(config.height,675);assert.ok(config.model);
   assert.match(buildArticleImagePrompt(idea),/Berita Auto/);assert.match(buildArticleImagePrompt(idea),/16:9/);assert.ok(fallbackSvg(idea,config).length>500);
-  console.log('article automation regression: PASS autonomous gates + opportunity + source discovery + image config/fallback + fact coverage');
+  assert.notEqual(intentSignature('cara mengecek aki motor'),intentSignature('cara merawat aki motor'),'different intents must not collapse into one signature');
+  assert.equal(evaluateArticlePublicationState({searchScore:100,sourceCount:5,articleQuality:{qualityScore:92,status:'READY'},imageUrl:'https://example.test/image.jpg',reviewReasons:[]}).eligible,true);
+  assert.equal(evaluateArticlePublicationState({searchScore:100,sourceCount:5,articleQuality:{qualityScore:92,status:'READY'},imageStatus:'failed',reviewReasons:['image_generation_failed']}).eligible,false);
+  console.log('article automation regression: PASS autonomous gates + opportunity + source discovery + dynamic intent guard + image config/fallback + publication gate');
 }finally{for(const key of Object.keys(process.env)){if(!(key in previous))delete process.env[key]}Object.assign(process.env,previous)}
