@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const image=fs.readFileSync(new URL('../lib/article-image.js',import.meta.url),'utf8');
+const header=fs.readFileSync(new URL('../components/Header.jsx',import.meta.url),'utf8');
+const nav=fs.readFileSync(new URL('../components/CategoryNavGrouped.jsx',import.meta.url),'utf8');
+const config=fs.readFileSync(new URL('../lib/article-config.js',import.meta.url),'utf8');
+assert.match(image,/CLOUDFLARE_MODEL/);assert.match(image,/generateCloudflareImage/);assert.match(image,/cloudflare_success/);assert.match(image,/findOpenLicenseImage/);assert.match(image,/payload\?\.result\?\.image/);assert.match(image,/cloudflare_rate_limited/);assert.match(image,/cloudflare_auth_failed/);assert.match(image,/Buffer\.from\(data,'base64'\)/);assert.match(image,/persistImage/);
+const cloudflare=image.indexOf('generateCloudflareImage(prompt,config)'),open=image.indexOf('findOpenLicenseImage(article)'),gemini=image.indexOf('GEMINI_API_KEY');assert(cloudflare>0&&open>cloudflare&&gemini>open,'Article image provider order must be Cloudflare -> Open License -> Gemini');
+assert.doesNotMatch(header,/site-primary-links/);assert.doesNotMatch(header,/>Berita<\/a>/);assert.match(nav,/articleLink/);assert.match(nav,/href="\/artikel"/);assert.match(nav,/Kategori Lainnya/);assert.match(nav,/category-nav-mobile/);
+assert.match(config,/ARTICLE_CLOUDFLARE_IMAGE_ENABLED/);assert.match(config,/@cf\/black-forest-labs\/flux-1-schnell/);assert.match(config,/configured:Boolean/);
+console.log('Article image/header regression: PASS');console.log('Cloudflare FLUX is primary; licensed/open and Gemini fallbacks retained.');console.log('Legacy standalone Berita|Artikel row removed; Artikel is fixed in category navigation.');
