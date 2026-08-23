@@ -15,6 +15,11 @@ const pipeline=read('lib/article-pipeline.js');assert.doesNotMatch(pipeline,/can
 const image=read('lib/article-image.js');assert.match(image,/checkArticleImageStorageHealth/);assert.match(image,/generationStatus/);assert.match(image,/persistenceStatus/);assert.match(image,/STORE_SUSPENDED/);
 const bulk=read('app/api/admin/instagram/review/route.js');assert.match(bulk,/bulk_delete_state_not_allowed/);assert.match(bulk,/requested,deleted,skipped,failed,failures/);assert.match(bulk,/removeInstagramPublishQueueItem/);assert.match(bulk,/status==='POSTED'/);
 const instagramUi=read('app/admin-instagram/InstagramDashboard.jsx');assert.match(instagramUi,/Hapus Semua Gagal \/ Perlu Perhatian/);assert.match(instagramUi,/Berita asli dan riwayat posting berhasil tidak akan dihapus/);assert.match(instagramUi,/result\.failed/);
+const prepRoute=read('app/api/admin/instagram/prepare-now/route.js');assert.doesNotMatch(prepRoute,/active:null/);assert.match(prepRoute,/getInstagramPreparationProgress/);assert.match(prepRoute,/progress/);
+const prepProgress=read('lib/instagram-preparation-progress.js');assert.match(prepProgress,/candidateResults/);assert.match(prepProgress,/MAX_RESULTS=20/);assert.match(prepProgress,/VERCEL_BLOB_STORE_SUSPENDED/);
+const prepLive=read('lib/instagram-preparation-admin-live.js');assert.match(prepLive,/checkSocialCardStorageHealth/);assert.match(prepLive,/SOCIAL_CARD_STORAGE_UNAVAILABLE/);assert.match(prepLive,/CARD_PERSIST/);assert.match(prepLive,/candidateResults/);
+const bulkJob=read('lib/instagram-bulk-delete.js');assert.match(bulkJob,/BATCH_SIZE=20/);assert.match(bulkJob,/POSTED/);assert.match(bulkJob,/PUBLISHING/);assert.match(bulkJob,/READY/);assert.match(bulkJob,/status:'COMPLETED'/);
+const bulkApi=read('app/api/admin/instagram/review/bulk-delete/[jobId]/route.js');assert.match(bulkApi,/runInstagramBulkDeleteBatch/);assert.match(bulkApi,/estimatedPercent/);
 const social=read('app/api/cron/social-publish/route.js');assert.match(social,/metaErrorCode/);assert.match(social,/metaErrorSubcode/);
 const telemetry=read('lib/article-automation-telemetry.js');assert.match(telemetry,/candidateDiagnostics/);
 console.log('emergency-runtime-automation-regression: PASS');
