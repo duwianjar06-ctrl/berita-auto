@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {parseMarkdown,normalizeArticleMarkdown,buildArticleHeadings} from '../components/article/ArticleDetailView.jsx';
 import {fallbackSvg,buildArticleImagePrompt,wrapTextByWords,titleLines} from '../lib/article-image.js';
 import {ARTICLE_CONFIG} from '../lib/article-config.js';
+import {entityList,similarity} from '../lib/entity-similarity.js';
 
 const markdown=`## Jawaban Singkat\n\n**Gunakan** prosedur sesuai manual kendaraan.\n\n## Langkah-Langkah\n\n1. Panaskan mesin hingga suhu kerja.\n2. Periksa baut penyetel.\n\n> Perhatian: mesin dapat panas.\n\n### Catatan\n\n- Gunakan area berventilasi.\n- Jangan memaksa baut.\n\n| Item | Nilai |\n| --- | --- |\n| Mesin | Sesuai manual |`;
 const legacy='## Jawaban Singkat\\n\\nKampas rem yang harus diganti.\\n\\n## Kesimpulan';
@@ -15,4 +16,16 @@ const titleResult=titleLines(longTitles[0]);assert.ok(titleResult.lines.some(x=>
 const fallback=fallbackSvg({title:longTitles[0],category:'Public Utility'},ARTICLE_CONFIG.image);assert.equal(Buffer.isBuffer(fallback),true);assert.ok(fallback.length>100);assert.doesNotMatch(fallback.toString('utf8'),/Menghemat Lis\s*<\/tspan>\s*<tspan[^>]*>trik/i);assert.match(fallback.toString('utf8'),/>Listrik(?: |<\/tspan>)/);
 const prompt=buildArticleImagePrompt({title:'Cara Menyetel Karburator Motor',primaryQuery:'cara menyetel karburator motor'});assert.match(prompt,/Berita Auto/);assert.match(prompt,/16:9/);
 assert.equal(ARTICLE_CONFIG.image.width,1200);assert.equal(ARTICLE_CONFIG.image.height,675);assert.equal(ARTICLE_CONFIG.image.templateVersion,2);
-console.log('article detail regression: PASS normalization + semantic markdown + toc + word wrapping + image fallback');
+
+const arrayEntities={entities:['Bank Indonesia','Bank Kliring Renminbi']};
+const objectEntities={entities:{people:['Pieter Huistra'],organizations:['PSS Sleman'],locations:['Indonesia']}};
+assert.deepEqual(entityList(arrayEntities.entities),['Bank Indonesia','Bank Kliring Renminbi']);
+assert.deepEqual(entityList(objectEntities.entities),['Pieter Huistra','PSS Sleman','Indonesia']);
+assert.deepEqual(entityList({groups:[['A',{nested:['B',null]},undefined],{deep:{items:['C']}}]}),['A','B','C']);
+assert.deepEqual(entityList(undefined),[]);assert.deepEqual(entityList(null),[]);assert.deepEqual(entityList('Bank Indonesia'),['Bank Indonesia']);
+assert.equal(similarity(arrayEntities,{entityNames:['Bank Indonesia']}),12);
+assert.equal(similarity(objectEntities,{entities:{organizations:['PSS Sleman'],locations:['Jakarta']}}),12);
+assert.doesNotThrow(()=>similarity({entities:objectEntities.entities},{entities:{nested:['PSS Sleman']}}));
+assert.doesNotMatch(String(entityList(objectEntities.entities)),/\[object Object\]/);
+
+console.log('article detail regression: PASS normalization + semantic markdown + toc + word wrapping + image fallback + entity similarity normalization');
