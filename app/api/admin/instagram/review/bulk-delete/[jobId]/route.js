@@ -1,0 +1,8 @@
+import {NextResponse} from 'next/server';
+import {requireAdmin} from '../../../../../../../lib/admin-guard.js';
+import {getInstagramBulkDeleteJob,runInstagramBulkDeleteBatch,cancelInstagramBulkDeleteJob} from '../../../../../../../lib/instagram-bulk-delete.js';
+export const dynamic='force-dynamic';export const runtime='nodejs';
+async function guard(){const admin=await requireAdmin();if(!admin)return NextResponse.json({error:'Unauthorized'},{status:401});if(admin.forbidden)return NextResponse.json({error:'Forbidden'},{status:403});return admin;}
+export async function GET(request,{params}){const denied=await guard();if(denied instanceof NextResponse)return denied;const {jobId}=await params;const job=await getInstagramBulkDeleteJob(jobId);if(!job)return NextResponse.json({error:'job_not_found'},{status:404});return NextResponse.json({...job,estimatedPercent:job.total?Math.round((job.processed/job.total)*100):100},{status:200,headers:{'Cache-Control':'no-store'}})}
+export async function POST(request,{params}){const denied=await guard();if(denied instanceof NextResponse)return denied;const {jobId}=await params;const job=await runInstagramBulkDeleteBatch(jobId,{batchSize:20});if(!job)return NextResponse.json({error:'job_not_found'},{status:404});return NextResponse.json({...job,estimatedPercent:job.total?Math.round((job.processed/job.total)*100):100},{status:200,headers:{'Cache-Control':'no-store'}})}
+export async function DELETE(request,{params}){const denied=await guard();if(denied instanceof NextResponse)return denied;const {jobId}=await params;const job=await cancelInstagramBulkDeleteJob(jobId);if(!job)return NextResponse.json({error:'job_not_found'},{status:404});return NextResponse.json(job,{status:200,headers:{'Cache-Control':'no-store'}})}
