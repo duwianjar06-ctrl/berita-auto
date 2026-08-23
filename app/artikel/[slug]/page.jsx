@@ -1,12 +1,13 @@
 import {notFound} from 'next/navigation';
-import {findArticle,listPublishedArticles,listAllArticles} from '../../../lib/article-storage.js';
+import {findArticle,listPublishedArticles,upsertArticle,normalizeArticle} from '../../../lib/article-storage.js';
 import {readPublicListArticles} from '../../../lib/public-data.js';
 import {getPopularArticles} from '../../../lib/analytics.js';
 import {categories} from '../../../lib/categories.js';
+import {generateAndPersistArticleImage} from '../../../lib/article-image.js';
 import ArticleDetailView from '../../../components/article/ArticleDetailView.jsx';
 import '../artikel.css';
-const base='https://berita-auto.vercel.app';
-export const dynamic='force-dynamic';
+const base='https://berita-auto.vercel.app';export const dynamic='force-dynamic';
 export async function generateMetadata({params}){const a=await findArticle((await params).slug);if(!a||a.status!=='PUBLISHED')return{robots:{index:false,follow:false}};const canonical=`${base}/artikel/${a.slug}`;return{title:a.metaTitle||a.title,description:a.metaDescription||a.excerpt,alternates:{canonical},robots:{index:true,follow:true},openGraph:{type:'article',url:canonical,title:a.metaTitle||a.title,description:a.metaDescription||a.excerpt,siteName:'Berita Auto',images:a.imageUrl?[{url:a.imageUrl,width:1200,height:675,alt:a.imageAlt||a.title}]:[]}}}
 function categoryCounts(items){const counts=Object.fromEntries(categories.map(c=>[c,0]));for(const a of items){const c=categories.find(x=>x.toLowerCase()===String(a.category||'').toLowerCase());if(c)counts[c]++}return counts}
-export default async function ArticleDetail({params}){const a=await findArticle((await params).slug);if(!a||a.status!=='PUBLISHED')notFound();const [all,news]=await Promise.all([listPublishedArticles(),readPublicListArticles()]);const popular=await getPopularArticles(all,7,5);const relatedArticles=all.filter(x=>x.id!==a.id&&(x.category===a.category||x.topicCluster===a.topicCluster));const relatedNews=news.filter(x=>x.contentType!=='article'&&x.category===a.category);return <ArticleDetailView article={a} latestArticles={all} popularArticles={popular} latestNews={news} relatedArticles={relatedArticles} relatedNews={relatedNews} categoryCounts={categoryCounts([...all,...news])}/>}
+async function ensureImage(article){if(!article?.content||article.imageUrl)return article;try{const image=await generateAndPersistArticleImage(article);if(image?.imageUrl)return await upsertArticle(normalizeArticle({...article,...image,imageStatus:'ready'}))}catch{}return article}
+export default async function ArticleDetail({params}){let a=await findArticle((await params).slug);if(!a||a.status!=='PUBLISHED')notFound();a=await ensureImage(a);const [all,news]=await Promise.all([listPublishedArticles(),readPublicListArticles()]);const popular=await getPopularArticles(all,7,5);const relatedArticles=all.filter(x=>x.id!==a.id).sort((x,y)=>{const score=z=>(z.topicCluster&&a.topicCluster&&z.topicCluster===a.topicCluster?50:0)+(z.category&&a.category&&String(z.category).toLowerCase()===String(a.category).toLowerCase()?20:0);return score(y)-score(x)});const relatedNews=news.filter(x=>x.contentType!=='article'&&x.id!==a.id).sort((x,y)=>{const rank=z=>/otomotif|automotive|transportasi|kendaraan/i.test(String(z.category||''))?1:0;return rank(y)-rank(x)});return <ArticleDetailView article={a} latestArticles={all} popularArticles={popular} latestNews={news} relatedArticles={relatedArticles} relatedNews={relatedNews} categoryCounts={categoryCounts([...all,...news])}/>}
