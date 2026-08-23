@@ -1,6 +1,6 @@
 import {NextResponse} from 'next/server';
-import {findArticle} from '../../../../../lib/article-storage.js';
-import {buildBrandedArticleFallbackSvg} from '../../../../../lib/article-image.js';
+import {findArticle} from '../../../../lib/article-storage.js';
+import {buildBrandedArticleFallbackSvg} from '../../../../lib/article-image.js';
 
 export const dynamic='force-dynamic';
 export const runtime='nodejs';
