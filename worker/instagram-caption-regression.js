@@ -21,6 +21,7 @@ assert.ok(!rich.caption.includes('Entity:'));
 assert.ok(!rich.caption.includes('Keyword:'));
 assert.ok(!rich.caption.includes('metadata:'));
 assert.ok(validateInstagramCaption(rich.caption,article).valid);
+assert.ok(rich.captionSourceHash);
 
 const duplicateArticle={...article,id:'caption-regression-2',content:`${longSentence(1)} ${longSentence(1)} ${longSentence(2)} ${longSentence(2)} ${longSentence(3)} ${longSentence(4)} ${longSentence(5)}`};
 const duplicateCaption=buildInstagramCaption(duplicateArticle).caption;
