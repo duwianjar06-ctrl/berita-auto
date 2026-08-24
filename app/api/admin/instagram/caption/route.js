@@ -2,7 +2,8 @@ import {NextResponse} from 'next/server';
 import {requireAdmin} from '../../../../../lib/admin-guard.js';
 import {getJson,setJson} from '../../../../../lib/persistence.js';
 import {readArticles} from '../../../../../lib/storage.js';
-import {buildInstagramSeo,validateInstagramCaption} from '../../../../../lib/social.js';
+import {buildInstagramSeo} from '../../../../../lib/social.js';
+import {validateInstagramCaption} from '../../../../../lib/instagram-caption.js';
 import {invalidateInstagramAdminSnapshot} from '../../../../../lib/instagram-admin-snapshot.js';
 
 export const dynamic='force-dynamic';
