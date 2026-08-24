@@ -1,8 +1,6 @@
 import {auth,signIn,signOut} from '../../auth.js';
 import InstagramDashboard from './InstagramDashboard.jsx';
 import {getInstagramAdminSnapshot} from '../../lib/instagram-admin-snapshot.js';
-import './admin-instagram.css';
-import './admin-instagram-overrides.css';
 export const dynamic='force-dynamic';
 export const metadata={title:'Instagram Review | Berita Auto',robots:{index:false,follow:false,noarchive:true}};
 function SeoPreview({items=[]}){const rows=items.filter(Boolean).slice(0,3);if(!rows.length)return null;return <section className="ig-panel" style={{maxWidth:'1180px',margin:'0 auto 24px'}}><div className="ig-panel-head"><div><span className="ig-kicker">SEO INSTAGRAM</span><h2>Preview Search-Friendly Post</h2><p>Metadata ini dibuat dari artikel yang sama dengan queue Instagram. Tidak mengubah scheduler atau Meta publisher.</p></div></div>{rows.map(row=><article key={row.queueId||row.articleId} style={{borderTop:'1px solid rgba(255,255,255,.08)',padding:'18px 0'}}><div style={{display:'flex',gap:'10px',alignItems:'center',flexWrap:'wrap'}}><strong>{row.seoStatus||'WARNING'}</strong><span>{row.category||'Berita'}</span><span>Keyword: {row.seoPrimaryKeyword||'—'}</span></div><h3>{row.seoHeadline||row.title}</h3><p style={{whiteSpace:'pre-wrap'}}>{row.seoCaption||row.caption||'Caption belum tersedia.'}</p><small>Entity: {(row.seoEntities||[]).join(', ')||'—'} · Hashtag: {(row.seoHashtags||[]).join(' ')||'—'} · Alt: {row.imageAltText||'—'}</small><br/><a href={row.articleUrl||row.canonicalUrl}>Buka artikel</a></article>)}</section>}
