@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const source=fs.readFileSync(new URL('../lib/instagram-auto-upload.js',import.meta.url),'utf8');
+assert.match(source,/published\.status==='already_posted'\|\|published\.status==='already_posted_reconciled'/,'already-posted reconciliation branch must exist');
+const reconciledBranch=source.indexOf("published.status==='already_posted'");
+const nextCandidate=source.indexOf('continue;',reconciledBranch);
+assert.ok(reconciledBranch>=0&&nextCandidate>reconciledBranch,'already-posted candidates must continue scanning');
+assert.match(source,/alreadyPostedReconciled\+=1/,'reconciliation telemetry must increment');
+assert.match(source,/metaPublishCalls:0/,'base telemetry must distinguish Meta publish calls');
+assert.match(source,/const MAX_PRE_META_SCAN=5/,'pre-Meta scan must remain bounded at five');
+assert.match(source,/base\.publishAttempted=1/,'real publish attempts must be counted');
+assert.doesNotMatch(source,/reason:'publish_failed_or_stale'/,'ambiguous stale publisher reason must be removed');
+const cadence=5*60*1000,grace=90*1000;
+const overdue=(last,now)=>now>last+cadence+grace;
+assert.equal(overdue(Date.parse('2026-08-24T06:50:00.000Z'),Date.parse('2026-08-24T06:54:00.000Z')),false);
+assert.equal(overdue(Date.parse('2026-08-24T06:50:00.000Z'),Date.parse('2026-08-24T06:55:00.000Z')),false);
+assert.equal(overdue(Date.parse('2026-08-24T06:50:00.000Z'),Date.parse('2026-08-24T06:57:00.000Z')),true);
+console.log('instagram-publisher-regression: PASS');
