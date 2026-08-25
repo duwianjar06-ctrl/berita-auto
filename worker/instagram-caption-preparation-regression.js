@@ -7,11 +7,12 @@ const preparation=fs.readFileSync(new URL('../lib/social-preparation.js',import.
 const publisher=fs.readFileSync(new URL('./social-run.js',import.meta.url),'utf8');
 
 assert.equal(CAPTION_GENERATOR_VERSION,'rich-v3');
-assert.match(preparation,/await buildInstagramCaptionAsync\(article,siteUrl\)/,'normal preparation must await rich-v3');
+assert.match(preparation,/buildInstagramCaptionAsync\(article,siteUrl\)/,'normal preparation must invoke rich-v3');
 assert.match(preparation,/captionStatus:cardReady\?'READY':'INVALID'/,'caption READY must follow card readiness');
 assert.match(preparation,/captionReady:cardReady&&Boolean\(captionMeta\.caption\)/,'READY must have persisted caption metadata');
 assert.match(preparation,/captionEdited===true/,'manual caption protection must remain');
 assert.match(preparation,/captionGeneratorVersion===CAPTION_GENERATOR_VERSION/,'rich-v3 reuse must be source-hash guarded');
+assert.match(preparation,/caption_generation_timeout/,'caption generation must have a bounded timeout');
 assert.doesNotMatch(publisher,/deterministicCaption\(/,'publisher must not generate a caption');
 assert.match(publisher,/processing\.captionStatus!=='READY'/,'publisher must require prepared caption');
 
