@@ -26,7 +26,7 @@
     "test:paraphrase":"node worker/paraphrase-regression.js",
     "test:admin-ui":"node worker/admin-ui-regression.js && node worker/emergency-runtime-automation-regression.js",
     "test:admin-instagram-server":"node worker/admin-instagram-server-regression.js && node worker/emergency-runtime-automation-regression.js && node worker/instagram-publisher-regression.js && node worker/instagram-observability-regression.js",
-    "test:admin-instagram-controls":"node worker/instagram-admin-controls-regression.js",
+    "test:admin-instagram-controls":"node worker/instagram-admin-controls-regression.js && node worker/instagram-queue-ui-regression.js",
     "test:admin-notes":"node worker/admin-notes-regression.js",
     "test:admin-processing":"node worker/admin-processing-regression.js",
     "test:homepage-image-display":"node worker/homepage-image-display-regression.js",
