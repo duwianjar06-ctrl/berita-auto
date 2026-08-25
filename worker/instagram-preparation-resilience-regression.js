@@ -1,3 +1,4 @@
+// Regression contract: preparation must be bounded, resumable, and never permanently PREPARING.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {buildInstagramSlides} from '../lib/social-visual.js';
