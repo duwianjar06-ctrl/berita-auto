@@ -1,0 +1,1 @@
+Preparation repair verification is maintained by the repository regression suite.
