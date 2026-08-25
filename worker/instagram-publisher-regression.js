@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 const source=fs.readFileSync(new URL('../lib/instagram-auto-upload.js',import.meta.url),'utf8');
 const socialRun=fs.readFileSync(new URL('./social-run.js',import.meta.url),'utf8');
+const adminPublish=fs.readFileSync(new URL('../app/api/admin/instagram/publish/route.js',import.meta.url),'utf8');
 assert.match(source,/published\.status==='already_posted'\|\|published\.status==='already_posted_reconciled'/,'already-posted reconciliation branch must exist');
 const reconciledBranch=source.indexOf("published.status==='already_posted'");
 const nextCandidate=source.indexOf('continue;',reconciledBranch);
@@ -16,6 +17,10 @@ assert.match(socialRun,/PERMANENT_CAROUSEL_META_SUBCODE=2207052/,'2207052 must h
 assert.match(socialRun,/mediaRepairAttempted/,'media repair telemetry must be persisted in the publish result');
 assert.match(socialRun,/mediaRepairSucceeded/,'media repair outcome must be persisted');
 assert.match(socialRun,/failedSlide/,'failed carousel slide must be correlated');
+assert.match(adminPublish,/result\.status==='already_posted_reconciled'/,'admin publish route must handle reconciled duplicates explicitly');
+assert.match(adminPublish,/status:'already_posted_reconciled'/,'reconciled duplicates must not be reported as published');
+assert.match(adminPublish,/reason:'new_meta_publish'/,'only a published result is labelled as a new Meta publish');
+assert.match(adminPublish,/result\.status==='failed'/,'admin publish route must preserve explicit failed status');
 const cadence=5*60*1000,grace=90*1000;
 const overdue=(last,now)=>now>last+cadence+grace;
 assert.equal(overdue(Date.parse('2026-08-24T06:50:00.000Z'),Date.parse('2026-08-24T06:54:00.000Z')),false);
