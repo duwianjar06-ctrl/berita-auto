@@ -1,3 +1,4 @@
+// Regression coverage for the canonical rich-v3 preparation wiring.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {buildInstagramCaptionAsync,CAPTION_GENERATOR_VERSION} from '../lib/instagram-caption.js';
