@@ -2,7 +2,8 @@ import {NextResponse} from 'next/server';
 import {auth} from '../../../../../auth.js';
 import {withPersistenceSource,setMembers,mgetJson,getJson} from '../../../../../lib/persistence.js';
 import {INSTAGRAM_PUBLISH_QUEUE_INDEX,INSTAGRAM_PUBLISH_THROTTLE_KEY,INSTAGRAM_PUBLISHING_USAGE_KEY} from '../../../../../lib/instagram-publish-queue.js';
-import {INSTAGRAM_NORMAL_PUBLISH_INTERVAL_MS,latestAttempt,normalizePublisherTrigger,schedulerHealth} from '../../../../../lib/instagram-publisher-observability.js';
+import {INSTAGRAM_NORMAL_PUBLISH_INTERVAL_MS} from '../../../../../lib/instagram-automation.js';
+import {latestAttempt,normalizePublisherTrigger,schedulerHealth} from '../../../../../lib/instagram-publisher-observability.js';
 const REVIEW_ITEM=id=>`ba:social:instagram:review:item:${id}`;const FALLBACK='/branding/instagram-profile-ba.svg';
 function queued(row){return ['QUEUED','WAITING_META'].includes(String(row?.status||'').toUpperCase())}
 function sort(a,b){return Number(b?.priority||0)-Number(a?.priority||0)||Date.parse(b?.priorityUpdatedAt||b?.queuedAt||b?.createdAt||'')-Date.parse(a?.priorityUpdatedAt||a?.queuedAt||a?.createdAt||'')||Date.parse(a?.queuedAt||a?.createdAt||'')-Date.parse(b?.queuedAt||b?.createdAt||'')}
