@@ -3,7 +3,7 @@ import {persistenceConfigured,acquireLock,releaseLock,getJson,setJson} from '../
 import {instagramConfigured,instagramConfig,createMediaContainer,createCarouselContainer,pollContainerReady,publishMediaContainer,getPublishingUsage,getMediaPermalink,classifyInstagramError} from '../lib/instagram.js';
 import {SOCIAL_LOCK_KEY,SOCIAL_LOCK_TTL,socialConfig,shouldSkipDailyLimit,shouldSkipMetaBuffer,queueSocialArticle,readSocialQueue,readRecentPublished,selectBestSocialArticle,buildEligibleSocialQueue,getDailyPublishedCount,getLastPublishedAt,markSocialProcessing,markSocialFailure,markSocialPublished,incrementDailyPublishedCount} from '../lib/social.js';
 import {buildSocialSlides} from '../lib/social-visual.js';
-import {buildCarouselImageUrls} from '../lib/social-carousel.js';
+import {buildCarouselImageUrls,INSTAGRAM_CAROUSEL_MAX_ITEMS} from '../lib/social-carousel.js';
 import {validateSocialCardUrl} from '../lib/social-card-validation.js';
 import {persistSocialCards} from '../lib/social-card-storage.js';
 import {getSocialFontDiagnostics} from '../lib/social-fonts.js';
