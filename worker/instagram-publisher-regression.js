@@ -12,6 +12,7 @@ assert.match(source,/metaPublishCalls:0/,'base telemetry must distinguish Meta p
 assert.match(source,/const MAX_PRE_META_SCAN=5/,'pre-Meta scan must remain bounded at five');
 assert.match(source,/base\.publishAttempted=1/,'real publish attempts must be counted');
 assert.doesNotMatch(source,/reason:'publish_failed_or_stale'/,'ambiguous stale publisher reason must be removed');
+assert.match(socialRun,/buildCarouselImageUrls,INSTAGRAM_CAROUSEL_MAX_ITEMS/,'publisher must import the shared carousel max-items contract');
 assert.match(socialRun,/PERMANENT_CAROUSEL_META_CODE=9004/,'9004 must have explicit permanent-media handling');
 assert.match(socialRun,/PERMANENT_CAROUSEL_META_SUBCODE=2207052/,'2207052 must have explicit permanent-media handling');
 assert.match(socialRun,/mediaRepairAttempted/,'media repair telemetry must be persisted in the publish result');
