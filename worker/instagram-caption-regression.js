@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {buildInstagramCaption,validateInstagramCaption,getInstagramCaptionSource} from '../lib/instagram-caption.js';
 import {buildInstagramSeo} from '../lib/social.js';
 
@@ -13,7 +14,7 @@ assert.equal(rich.captionGeneratedBy,'deterministic-rich-paraphrase');
 assert.equal(rich.captionGeneratorVersion,'rich-v2');
 assert.equal(rich.oneAiCallMax,0);
 assert.ok(rich.factCount>=8,`expected >=8 facts, got ${rich.factCount}`);
-assert.ok(rich.captionLength>=900,`expected >=900, got ${rich.captionLength}`);
+assert.ok(rich.captionLength>=1600,`expected rich long caption >=1600, got ${rich.captionLength}`);
 assert.ok(rich.captionLength<=2100,`expected <=2100, got ${rich.captionLength}`);
 assert.ok(rich.caption.split(/\n\n/).length>=5,`expected >=5 paragraphs, got ${rich.caption.split(/\n\n/).length}`);
 assert.ok(rich.caption.includes('Arsenal'));
@@ -52,11 +53,11 @@ assert.ok(seo.primaryKeyword);
 assert.ok(Array.isArray(seo.hashtags));
 assert.ok(!seo.caption.includes('Keyword:'));
 
-const publisherSource=await (await import('node:fs/promises')).readFile(new URL('./social-run.js',import.meta.url),'utf8');
+const publisherSource=await readFile(new URL('./social-run.js',import.meta.url),'utf8');
 assert.match(publisherSource,/processing\.caption\|\|processing\.captionOriginal\|\|deterministicCaption/);
 assert.doesNotMatch(publisherSource,/const caption=deterministicCaption\(processing\.article/);
 
-const routeSource=await (await import('node:fs/promises')).readFile(new URL('../app/api/admin/instagram/caption/route.js',import.meta.url),'utf8');
+const routeSource=await readFile(new URL('../app/api/admin/instagram/caption/route.js',import.meta.url),'utf8');
 assert.match(routeSource,/if\(row\.captionEdited\)throw new Error\('manual_caption_protected'\)/);
 assert.match(routeSource,/caption:seo\.caption/);
 assert.doesNotMatch(routeSource,/cardUrls:/);
