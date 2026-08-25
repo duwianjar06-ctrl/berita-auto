@@ -1,39 +1,45 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {getInstagramPublishPacing,INSTAGRAM_NORMAL_PUBLISH_INTERVAL_MS,INSTAGRAM_PUBLISH_CLOCK_TOLERANCE_MS} from '../lib/instagram-auto-upload.js';
+import {DEFAULT_AUTO_UPLOAD_INTERVAL_MINUTES} from '../lib/instagram-automation.js';
 import {classifyInstagramPublishFailure,isMetaActionThrottle,throttleBackoffMs} from '../lib/instagram-publish-queue.js';
 const read=p=>fs.readFileSync(new URL(`../${p}`,import.meta.url),'utf8');
 const queue=read('lib/instagram-publish-queue.js');
 const autoUpload=read('lib/instagram-auto-upload.js');
 const automation=read('lib/instagram-automation.js');
+const observability=read('lib/instagram-publisher-observability.js');
 const socialRun=read('worker/social-run.js');
 const publisherRoute=read('app/api/cron/social-publish/route.js');
+const queueRoute=read('app/api/admin/instagram/queue/route.js');
+const queueCard=read('app/admin-instagram/InstagramQueueItemCard.jsx');
 const code9Limit={metaCode:9,metaSubcode:2207042,message:'publishing limit reached'};
 const code9Actions={metaCode:9,metaSubcode:2207069,message:'User is performing too many actions'};
 const t0=Date.parse('2026-08-18T03:35:00.000Z');
-const interval=5*60*1000;
+const interval=2*60*1000;
 const last={publishedAt:new Date(t0).toISOString(),nextAllowedAt:new Date(t0+interval).toISOString()};
 
-// A: exactly 5m after the successful publish is eligible with READY backlog.
-assert.equal(INSTAGRAM_NORMAL_PUBLISH_INTERVAL_MS,5*60*1000);
-assert.equal(automation.match(/DEFAULT_AUTO_UPLOAD_INTERVAL_MINUTES=5/g)?.length,1);
-assert.equal(getInstagramPublishPacing(last,{now:t0+5*60*1000}).eligible,true);
-// B: 4m remains protected by normal pacing.
-assert.equal(getInstagramPublishPacing(last,{now:t0+4*60*1000}).eligible,false);
-// C: 30s scheduler tolerance allows a slightly early tick, while 5m remains the normal boundary.
+// A: normal interval is a shared 2-minute source of truth, with env override support.
+assert.equal(DEFAULT_AUTO_UPLOAD_INTERVAL_MINUTES,2);
+assert.equal(INSTAGRAM_NORMAL_PUBLISH_INTERVAL_MS,2*60*1000);
+assert.match(automation,/INSTAGRAM_AUTO_UPLOAD_INTERVAL_MINUTES/);
+assert.match(automation,/DEFAULT_AUTO_UPLOAD_INTERVAL_MINUTES/);
+assert.equal(getInstagramPublishPacing(last,{now:t0+2*60*1000}).eligible,true);
+// B: 1m remains protected by normal pacing.
+assert.equal(getInstagramPublishPacing(last,{now:t0+1*60*1000}).eligible,false);
+// C: 30s scheduler tolerance allows a slightly early tick, while 2m remains the normal boundary.
 assert.equal(INSTAGRAM_PUBLISH_CLOCK_TOLERANCE_MS,30*1000);
-assert.equal(getInstagramPublishPacing(last,{now:t0+4*60*1000+29*1000}).eligible,false);
-assert.equal(getInstagramPublishPacing(last,{now:t0+4*60*1000+30*1000}).eligible,true);
-assert.equal(getInstagramPublishPacing(last,{now:t0+5*60*1000+100}).eligible,true);
-// D: scheduler cadence T+0, T+5, T+10 is eligible after each successful publish.
-for(const offset of [0,5,10]){
+assert.equal(getInstagramPublishPacing(last,{now:t0+1*60*1000+29*1000}).eligible,false);
+assert.equal(getInstagramPublishPacing(last,{now:t0+1*60*1000+30*1000}).eligible,true);
+assert.equal(getInstagramPublishPacing(last,{now:t0+2*60*1000+100}).eligible,true);
+// D: scheduler cadence T+0, T+2, T+4 is eligible after each successful publish.
+for(const offset of [0,2,4]){
   const successAt=t0+offset*60*1000;
   const cycle={publishedAt:new Date(successAt).toISOString(),nextAllowedAt:new Date(successAt+interval).toISOString()};
-  assert.equal(getInstagramPublishPacing(cycle,{now:successAt+5*60*1000}).eligible,true);
+  assert.equal(getInstagramPublishPacing(cycle,{now:successAt+2*60*1000}).eligible,true);
 }
-// E: successful publish persists nextAllowedAt exactly +5m from the actual successful time.
+// E: successful publish persists nextAllowedAt exactly +2m from the actual successful time.
 const successAt=Date.parse('2026-08-18T03:35:34.000Z');
-const expectedNext=successAt+5*60*1000;
+const expectedNext=successAt+2*60*1000;
 const successRecord={publishedAt:new Date(successAt).toISOString(),nextAllowedAt:new Date(expectedNext).toISOString()};
 assert.equal(Date.parse(getInstagramPublishPacing(successRecord,{now:successAt}).nextAllowedAt),expectedNext);
 assert.equal(getInstagramPublishPacing(successRecord,{now:expectedNext}).eligible,true);
@@ -59,7 +65,11 @@ assert.doesNotMatch(socialRun,/metaSubcode\)===2207042/);
 assert.equal((autoUpload.match(/publishInstagramReviewItemQueued\(/g)||[]).length,1);
 assert.doesNotMatch(autoUpload,/for\([^)]*queue|while\([^)]*queue/);
 assert.match(autoUpload,/publishPosted=1/);
-// I: telemetry exposes the required production fields and 5m interval.
+// I: telemetry exposes the required production fields and shared 2m interval.
 assert.match(autoUpload,/normalIntervalMs:INSTAGRAM_NORMAL_PUBLISH_INTERVAL_MS/);
+assert.match(observability,/INSTAGRAM_PUBLISH_CADENCE_MS = INSTAGRAM_NORMAL_PUBLISH_INTERVAL_MS/);
+assert.match(queueRoute,/normalIntervalMs:INSTAGRAM_NORMAL_PUBLISH_INTERVAL_MS/);
+assert.match(queueCard,/intervalMs=120000/);
+assert.doesNotMatch(queueCard,/5\*60\*1000/);
 for(const field of ['status','reason','ready','queued','throttleActive','lastSuccessAt','nextAllowedAt','intervalRemainingMs','metaPublishCalls','published','mediaId','durationMs'])assert.match(publisherRoute,new RegExp(field));
-console.log('instagram publisher pacing regression: PASS 5m deterministic pacing + 30s tolerance + T/T+5/T+10 cadence + success nextAllowedAt + code9 long backoff + one-post-per-run + telemetry');
+console.log('instagram publisher pacing regression: PASS 2m deterministic pacing + 30s tolerance + T/T+2/T+4 cadence + success nextAllowedAt + code9 long backoff + one-post-per-run + shared UI/observability interval');
