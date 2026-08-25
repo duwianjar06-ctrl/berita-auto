@@ -1,0 +1,36 @@
+name: Instagram Script Run
+on:
+  push:
+    branches: [feature/auto-news-mvp]
+permissions:
+  contents: write
+jobs:
+  repair:
+    if: ${{ !contains(github.event.head_commit.message, '[instagram-script-repair]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/auto-news-mvp
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply repair script
+        run: node scripts/instagram-final-repair.mjs
+      - name: Verify focused Instagram regressions
+        run: |
+          npm ci
+          node worker/instagram-preparation-resilience-regression.js
+          node worker/instagram-caption-preparation-regression.js
+          node worker/instagram-publisher-regression.js
+          node worker/instagram-observability-regression.js
+          node worker/admin-instagram-server-regression.js
+      - name: Commit source changes
+        run: |
+          git config user.name 'projectdaaw-bot'
+          git config user.email 'projectdaaw-bot@users.noreply.github.com'
+          git add app lib worker
+          git diff --cached --check
+          git commit -m '[instagram-script-repair] complete bounded preparation repair'
+          git push origin feature/auto-news-mvp
