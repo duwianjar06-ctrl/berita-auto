@@ -1,0 +1,38 @@
+name: Instagram Final Fix
+on:
+  push:
+    branches: [feature/auto-news-mvp]
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: ${{ !contains(github.event.head_commit.message, '[instagram-final-fix]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/auto-news-mvp
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Fix read-only progress route and auto resume UI
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          route=Path('app/api/admin/instagram/prepare-now/route.js');s=route.read_text();start=s.index('async function state(){');end=s.index('\nexport async function GET',start);new="async function state(){const progress=await getInstagramPreparationProgress({recoverStale:true});const heartbeat=Date.parse(progress?.heartbeatAt||progress?.updatedAt||progress?.startedAt||'');const active=progress?.status==='PREPARING'&&!progress?.resumeRequired&&Number(progress?.expiresAt||0)>Date.now()&&Number.isFinite(heartbeat)&&Date.now()-heartbeat<=30000?{runId:progress.runId,trigger:progress.trigger,startedAt:progress.startedAt,expiresAt:progress.expiresAt,requestedTarget:progress.requestedTarget||null,resumeRequired:false}:null;const lastRun=!active&&progress?.completedAt?{runId:progress.runId,status:progress.status,attempted:progress.attempted||0,ready:progress.ready||0,failed:progress.failed||0,requestedTarget:progress.requestedTarget||null,primaryBlocker:progress.primaryBlocker||null,failureBreakdown:progress.failureBreakdown||{},completedAt:progress.completedAt,resumeRequired:Boolean(progress.resumeRequired),staleRecoveredAt:progress.staleRecoveredAt||null}:null;return{active,lastRun,progress:progress||null,logs:[]}}";route.write_text(s[:start]+new+s[end:])
+          ui=Path('app/admin-instagram/InstagramAdminLiveProgress.jsx');u=ui.read_text();u=u.replace("import {useEffect,useMemo,useState} from 'react';","import {useEffect,useMemo,useRef,useState} from 'react';");u=u.replace("const[prep,setPrep]=useState(null),[watch,setWatch]=useState(true),[deleteJob", "const[prep,setPrep]=useState(null),[watch,setWatch]=useState(true),[resumeBusy,setResumeBusy]=useState(false),[deleteJob");u=u.replace("const progress=prep?.progress;", "const resumeLock=useRef(false);const progress=prep?.progress;");old="async function readPrep(){try{const b=await json('/api/admin/instagram/prepare-now');setPrep(b);setWatch(Boolean(b.active||b.progress?.resumeRequired));return b}catch(e){console.warn(e.message);return null}}";new="async function readPrep(){try{const b=await json('/api/admin/instagram/prepare-now');setPrep(b);setWatch(Boolean(b.active||b.progress?.resumeRequired));if(b?.progress?.resumeRequired&&Number(b.progress.ready||0)<Number(b.progress.requestedTarget||0)&&!resumeLock.current){resumeLock.current=true;setResumeBusy(true);try{const next=await json('/api/admin/instagram/prepare-now',{method:'POST',body:JSON.stringify({targetReady:Number(b.progress.requestedTarget||1)})});setPrep(next);setWatch(Boolean(next.active||next.resumeRequired||next.progress?.resumeRequired));}finally{resumeLock.current=false;setResumeBusy(false)}}return b}catch(e){console.warn(e.message);return null}}";u=u.replace(old,new);u=u.replace("<p><b>Tahap:</b> {label(progress.stage||progress.currentStage)}</p>","<p><b>Tahap:</b> {label(progress.stage||progress.currentStage)}{resumeBusy?' · melanjutkan…':''}</p>");ui.write_text(u)
+          PY
+      - name: Run Instagram regressions
+        run: |
+          npm ci
+          npm test
+          node worker/instagram-preparation-resilience-regression.js
+      - name: Commit final fix
+        run: |
+          git config user.name 'projectdaaw-bot'
+          git config user.email 'projectdaaw-bot@users.noreply.github.com'
+          git add app worker
+          git diff --cached --check
+          git commit -m '[instagram-final-fix] finalize lightweight progress and resume lifecycle'
+          git push origin feature/auto-news-mvp
