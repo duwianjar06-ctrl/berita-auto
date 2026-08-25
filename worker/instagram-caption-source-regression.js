@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import {resolveCanonicalInstagramArticle,canonicalInstagramSourceDiagnostics} from '../lib/instagram-article-resolver.js';
+import {buildInstagramCaptionAsync,getInstagramCaptionSource,CAPTION_GENERATOR_VERSION} from '../lib/instagram-caption.js';
+import {readFile} from 'node:fs/promises';
+
+const canonical={id:'article-1',stableId:'stable-1',title:'Berita lengkap',category:'Nasional',content:'Isi artikel canonical yang panjang dan berisi fakta penting untuk caption Instagram. '.repeat(20),sourceUrl:'https://example.com/article-1',sitePublishedAt:'2026-08-25T00:00:00.000Z'};
+const slim={article:{id:'article-1',stableId:'stable-1',title:'Berita lengkap',category:'Nasional',content:undefined},articleId:'article-1'};
+const resolved=resolveCanonicalInstagramArticle(slim,[canonical]);
+assert.equal(resolved.content,canonical.content,'slim queue content must not replace canonical content');
+assert.equal(canonicalInstagramSourceDiagnostics(slim,[canonical]).sourceLength,canonical.content.length);
+assert.equal(getInstagramCaptionSource(resolved).sourceField,'content');
+const generated=await buildInstagramCaptionAsync(resolved,'https://berita-auto.vercel.app');
+assert.equal(generated.captionGeneratorVersion,CAPTION_GENERATOR_VERSION);
+assert.ok(Number(generated.captionSourceLength)>0);
+assert.equal(generated.captionSourceField,'content');
+const empty=await buildInstagramCaptionAsync({id:'empty',title:'Judul saja'},'https://berita-auto.vercel.app');
+assert.equal(empty.captionFailureCode,'CAPTION_SOURCE_EMPTY');
+const route=await readFile(new URL('../app/api/admin/instagram/prepare-now/route.js',import.meta.url),'utf8');
+assert.match(route,/getInstagramPreparationProgress/);
+assert.doesNotMatch(route,/getInstagramAdminSnapshot\(/,'GET progress route must not rebuild full admin snapshot');
+assert.doesNotMatch(route,/buildInstagramCaptionAsync|prepareInstagramCandidate\(/,'GET progress route must remain read-only');
+const caption=await readFile(new URL('../lib/instagram-caption.js',import.meta.url),'utf8');
+assert.match(caption,/CAPTION_AI_TIMEOUT_MS/);
+assert.match(caption,/CAPTION_AI_TIMEOUT/);
+assert.match(caption,/captionFailureCode:'CAPTION_AI_TIMEOUT'/);
+console.log('instagram-caption-source-regression: PASS');
