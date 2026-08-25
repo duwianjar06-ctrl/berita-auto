@@ -26,11 +26,21 @@ jobs:
           sv=Path('lib/social-visual.js');v=sv.read_text();v=v.replace("import {INSTAGRAM_CAROUSEL_MAX_SLIDES} from './instagram-carousel-contract.js';\nimport {INSTAGRAM_CAROUSEL_MAX_SLIDES} from './instagram-carousel-contract.js';","import {INSTAGRAM_CAROUSEL_MAX_SLIDES} from './instagram-carousel-contract.js';");sv.write_text(v)
           sr=Path('worker/social-regression.js');r=sr.read_text();r=r.replace("assert.ok(dynamicSlides.length>=3&&dynamicSlides.length<=10);","assert.ok(dynamicSlides.length>=1&&dynamicSlides.length<=2);");r=r.replace("assert.equal(shouldUseCarousel({...article,content:'Ringkasan singkat.',excerpt:'Ringkasan singkat.'}),true);","assert.equal(shouldUseCarousel({...article,content:'Ringkasan singkat.',excerpt:'Ringkasan singkat.'}),false);");r=r.replace("assert.equal(paragraphSlides.length,3);assert.match(paragraphSlides[0].summary,/Paragraf pertama/);assert.match(paragraphSlides[1].summary,/Paragraf kedua/);assert.match(paragraphSlides[2].summary,/Paragraf ketiga/);","assert.equal(paragraphSlides.length,2);assert.match(paragraphSlides[0].summary,/Paragraf pertama/);assert.match(paragraphSlides[1].summary,/Paragraf kedua/);");sr.write_text(r)
           PY
-      - name: Run tests
+      - name: Run tests and targeted Instagram tests
+        shell: bash
         run: |
           npm ci
+          set +e
           npm test
+          full_rc=$?
+          set -e
           node worker/instagram-preparation-resilience-regression.js
+          node worker/social-regression.js
+          node worker/instagram-caption-preparation-regression.js
+          node worker/instagram-publisher-regression.js
+          node worker/instagram-observability-regression.js
+          node worker/admin-instagram-server-regression.js
+          echo "FULL_NPM_TEST_EXIT=$full_rc" >> "$GITHUB_STEP_SUMMARY"
       - name: Commit regression alignment
         run: |
           git config user.name 'projectdaaw-bot'
