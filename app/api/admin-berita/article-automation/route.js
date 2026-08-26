@@ -3,7 +3,8 @@ import {runArticlePipeline} from '../../../../lib/article-pipeline.js';
 import {discoverArticleOpportunities} from '../../../../lib/article-ideas.js';
 import {listArticleAutomationRuns} from '../../../../lib/article-automation-telemetry.js';
 import {findArticle,listAllArticles,upsertArticle,normalizeArticle} from '../../../../lib/article-storage.js';
-import {generateAndPersistArticleImageWithRecovery,checkArticleImageStorageHealth} from '../../../../lib/article-image-recovery.js';
+import {generateAndPersistArticleImageWithRecovery} from '../../../../lib/article-image-recovery.js';
+import {checkArticleImageStorageHealth} from '../../../../lib/article-image.js';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
