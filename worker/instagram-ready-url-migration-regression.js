@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {reviewItemKey,repairReadyInstagramItem,migrateReadyInstagramItems} from '../lib/instagram-ready-url-migration.js';
+
+const legacy='https://berita-auto.vercel.app';
+const item={status:'READY',queueId:'article-123:stable-456',articleId:'article-123',stableId:'stable-456',canonicalUrl:`${legacy}/berita/article-123`,caption:`Baca: ${legacy}/berita/article-123`,cardUrls:[`${legacy}/api/social-card/article-123?slide=1`,'https://example.public.blob.vercel-storage.com/card.jpg'],preparedAt:'2026-01-01T00:00:00Z'};
+const repaired=repairReadyInstagramItem(item);
+assert.equal(repaired.changed,true);
+assert.equal(repaired.item.queueId,item.queueId);
+assert.equal(reviewItemKey(item.queueId),'ba:social:instagram:review:item:article-123:stable-456');
+assert.equal(reviewItemKey(item.queueId).includes('review:item:article-123'),true);
+assert.equal(repaired.item.cardUrls[1],item.cardUrls[1]);
+assert.equal(repaired.item.preparedAt,item.preparedAt);
+const second=migrateReadyInstagramItems([repaired.item],{dryRun:true});
+assert.equal(second.wouldRepair,0);
+assert.equal(second.unchanged,1);
+const missingQueue=repairReadyInstagramItem({...item,queueId:undefined});
+assert.equal(missingQueue.failed,true);
+const published=repairReadyInstagramItem({...item,postedAt:'2026-01-02T00:00:00Z'});
+assert.equal(published.changed,false);
+console.log('instagram-ready-url-migration-regression: PASS');
