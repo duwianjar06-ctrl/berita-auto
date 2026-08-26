@@ -11,7 +11,7 @@
     "news:repair":"node worker/repair.js",
     "social:run":"node worker/social-run.js",
     "social:repair":"node worker/social-repair.js",
-    "test":"node worker/test-suite.js && node worker/validation-query-regression.js && node worker/article-regression.js && node worker/article-automation-regression.js && node worker/article-config-regression.js && node worker/article-detail-regression.js && node worker/instagram-seo-regression.js && node worker/instagram-caption-regression.js && node worker/instagram-caption-source-regression.js && node worker/instagram-caption-preparation-regression.js && node worker/instagram-preparation-resilience-regression.js && node worker/story-carousel-regression.js && node worker/article-image-regression.js && node worker/article-image-recovery-regression.js && node worker/article-url-migration-regression.js && node worker/legacy-domain-regression.js && node worker/emergency-runtime-automation-regression.js && node worker/instagram-publisher-regression.js && node worker/instagram-observability-regression.js",
+    "test":"node worker/test-suite.js && node worker/validation-query-regression.js && node worker/article-regression.js && node worker/article-automation-regression.js && node worker/article-config-regression.js && node worker/article-detail-regression.js && node worker/instagram-seo-regression.js && node worker/instagram-caption-regression.js && node worker/instagram-caption-source-regression.js && node worker/instagram-caption-preparation-regression.js && node worker/instagram-preparation-resilience-regression.js && node worker/story-carousel-regression.js && node worker/article-image-regression.js && node worker/article-image-recovery-regression.js && node worker/article-url-migration-regression.js && node worker/instagram-ready-url-migration-regression.js && node worker/legacy-domain-regression.js && node worker/emergency-runtime-automation-regression.js && node worker/instagram-publisher-regression.js && node worker/instagram-observability-regression.js",
     "test:article":"node worker/article-regression.js && node worker/article-automation-regression.js && node worker/article-config-regression.js && node worker/article-detail-regression.js && node worker/article-image-regression.js && node worker/article-image-recovery-regression.js && node worker/article-url-migration-regression.js && node worker/emergency-runtime-automation-regression.js",
     "test:search-intent":"node worker/search-intent-regression.js",
     "test:validation-query":"node worker/validation-query-regression.js",
@@ -35,6 +35,6 @@
     "test:performance":"node worker/performance-regression.js",
     "test:emergency":"node worker/emergency-runtime-automation-regression.js"
   },
-  "dependencies":{"@auth/core":"0.41.3","@vercel/analytics":"^2.0.1","@vercel/blob":"2.6.1","@vercel/speed-insights":"^2.0.0","next":"15.5.21","next-auth":"^5.0.0-beta.29","react":"19.1.0","react-dom":"19.1.0"},
+  "dependencies":{"@auth/core":"0.41.3","@vercel/analytics":"^2.0.1","@vercel/blob":"2.6.1","@vercel/speed-insights":"^2.0.1","next":"15.5.21","next-auth":"^5.0.0-beta.29","react":"19.1.0","react-dom":"19.1.0"},
   "overrides":{"postcss":"8.5.25","sharp":"0.35.3"}
 }
