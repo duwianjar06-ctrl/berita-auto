@@ -1,0 +1,7 @@
+import {NextResponse} from 'next/server';
+import {auth} from '../../../../../auth.js';
+import {auditInstagramPublishQueueUrls,migrateInstagramPublishQueueUrls} from '../../../../../lib/instagram-publish-queue-url-migration.js';
+export const dynamic='force-dynamic';
+async function authorized(){let session=null;try{session=await auth()}catch{return false}const allowed=(process.env.ADMIN_EMAILS||'').split(',').map(v=>v.trim().toLowerCase()).filter(Boolean);const email=session?.user?.email?.trim().toLowerCase();return Boolean(email&&allowed.includes(email));}
+export async function GET(){if(!await authorized())return NextResponse.json({error:'Unauthorized'},{status:401});try{return NextResponse.json(await auditInstagramPublishQueueUrls(),{status:200,headers:{'Cache-Control':'no-store'}})}catch(error){return NextResponse.json({error:'Publish queue migration audit failed.',detail:String(error?.message||error).slice(0,240)},{status:500})}}
+export async function POST(request){if(!await authorized())return NextResponse.json({error:'Unauthorized'},{status:401});let body={};try{body=await request.json()}catch{}const dryRun=body?.dryRun!==false;try{return NextResponse.json(await migrateInstagramPublishQueueUrls({dryRun}),{status:200,headers:{'Cache-Control':'no-store'}})}catch(error){return NextResponse.json({error:'Publish queue migration failed.',detail:String(error?.message||error).slice(0,240)},{status:500})}}
